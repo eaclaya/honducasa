@@ -1,0 +1,43 @@
+name: honducasa
+
+services:
+  database:
+    image: postgis/postgis:17-3.5
+    platform: linux/amd64
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: honducasa
+      POSTGRES_USER: honducasa
+      POSTGRES_PASSWORD: honducasa
+    ports:
+      - '127.0.0.1:55432:5432'
+    volumes:
+      - database-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  database-testing:
+    image: postgis/postgis:17-3.5
+    platform: linux/amd64
+    profiles: ['testing']
+    environment:
+      POSTGRES_DB: honducasa_testing
+      POSTGRES_USER: honducasa
+      POSTGRES_PASSWORD: honducasa
+    ports:
+      - '127.0.0.1:55433:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+
+volumes:
+  database-data:
