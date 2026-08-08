@@ -22,7 +22,7 @@ test('PostGIS is enabled with a spatial property index', function () {
 });
 
 test('properties can be filtered and ordered within a radius', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->withPersonalTeam()->create();
     $location = Location::factory()->create();
     $origin = new GeoPoint(latitude: 14.0723, longitude: -87.1921);
 

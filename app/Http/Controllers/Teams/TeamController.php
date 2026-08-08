@@ -40,6 +40,10 @@ class TeamController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Team created.')]);
 
+        if ($request->boolean('publish')) {
+            return to_route('listings.create', ['current_team' => $team->slug]);
+        }
+
         return to_route('teams.edit', ['team' => $team->slug]);
     }
 
@@ -136,6 +140,8 @@ class TeamController extends Controller
 
         if ($fallbackTeam) {
             $user->switchTeam($fallbackTeam);
+        } elseif ($user->isCurrentTeam($team)) {
+            $user->forgetCurrentTeam();
         }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('You left the team ":name"', ['name' => $team->name])]);
@@ -156,7 +162,13 @@ class TeamController extends Controller
         DB::transaction(function () use ($user, $team) {
             User::where('current_team_id', $team->id)
                 ->where('id', '!=', $user->id)
-                ->each(fn (User $affectedUser) => $affectedUser->switchTeam($affectedUser->personalTeam()));
+                ->each(function (User $affectedUser) use ($team) {
+                    $fallback = $affectedUser->fallbackTeam($team);
+
+                    $fallback
+                        ? $affectedUser->switchTeam($fallback)
+                        : $affectedUser->forgetCurrentTeam();
+                });
 
             $team->invitations()->delete();
             $team->memberships()->delete();

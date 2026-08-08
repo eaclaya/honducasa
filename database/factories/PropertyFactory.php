@@ -3,7 +3,10 @@
 namespace Database\Factories;
 
 use App\Data\GeoPoint;
+use App\Enums\ApproximateLocationShape;
 use App\Enums\Furnishing;
+use App\Enums\ListingStatus;
+use App\Enums\ListingType;
 use App\Enums\LocationPrecision;
 use App\Enums\PropertyType;
 use App\Models\Location;
@@ -29,19 +32,25 @@ class PropertyFactory extends Factory
         $longitude = fake()->longitude(-87.35, -87.05);
 
         return [
-            'created_by' => User::factory(),
+            'created_by' => User::factory()->withPersonalTeam(),
             'team_id' => fn (array $attributes) => User::query()
                 ->whereKey($attributes['created_by'])
                 ->sole()
                 ->current_team_id,
             'location_id' => Location::factory(),
             'type' => fake()->randomElement(PropertyType::cases()),
+            'listing_type' => ListingType::Rent,
+            'status' => ListingStatus::Published,
+            'published_at' => now(),
             'name' => $name,
             'slug' => Str::slug($name).'-'.Str::lower(Str::random(6)),
             'address_line' => fake()->streetAddress(),
             'address_landmark' => fake()->sentence(6),
             'coordinates' => (new GeoPoint($latitude, $longitude))->toPostgisPoint(),
             'public_location_precision' => LocationPrecision::Approximate,
+            'approximate_shape' => ApproximateLocationShape::Radius,
+            'approximate_radius_meters' => 1_000,
+            'approximate_polygon' => null,
             'bedrooms' => fake()->numberBetween(0, 5),
             'bathrooms' => fake()->randomElement(['1.0', '1.5', '2.0', '2.5', '3.0']),
             'parking_spaces' => fake()->numberBetween(0, 3),
@@ -49,6 +58,10 @@ class PropertyFactory extends Factory
             'lot_area_m2' => fake()->optional()->numberBetween(80, 1_000),
             'year_built' => fake()->optional()->numberBetween(1950, now()->year),
             'furnishing' => fake()->randomElement(Furnishing::cases()),
+            'price_amount' => fake()->numberBetween(5_000, 35_000),
+            'currency' => 'HNL',
+            'deposit_amount' => fake()->numberBetween(5_000, 35_000),
+            'utilities_included' => fake()->boolean(20),
             'description' => fake()->paragraphs(2, true),
         ];
     }

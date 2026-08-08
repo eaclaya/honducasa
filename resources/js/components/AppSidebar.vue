@@ -32,13 +32,18 @@ import { show as messages } from '@/routes/messages';
 import { index as notifications } from '@/routes/notifications';
 import { index as rentals } from '@/routes/rentals';
 import { index as savedSearches } from '@/routes/saved-searches';
+import { dashboard as userDashboard } from '@/routes/user';
 import type { NavItem } from '@/types';
 
 const page = usePage();
 
 const dashboardUrl = computed(() =>
-    page.props.currentTeam ? dashboard(page.props.currentTeam.slug).url : '/',
+    page.props.currentTeam
+        ? dashboard(page.props.currentTeam.slug).url
+        : userDashboard().url,
 );
+
+const hasTeams = computed(() => page.props.teams.length > 0);
 
 const mainNavItems = computed<NavItem[]>(() => [
     {
@@ -54,13 +59,18 @@ const mainNavItems = computed<NavItem[]>(() => [
         href: rentals().url,
         icon: Compass,
     },
-    {
-        title: page.props.locale === 'es' ? 'Mis propiedades' : 'My listings',
-        href: page.props.currentTeam
-            ? listings.url(page.props.currentTeam.slug)
-            : '/',
-        icon: Building2,
-    },
+    ...(page.props.currentTeam
+        ? [
+              {
+                  title:
+                      page.props.locale === 'es'
+                          ? 'Mis propiedades'
+                          : 'My listings',
+                  href: listings.url(page.props.currentTeam.slug),
+                  icon: Building2,
+              },
+          ]
+        : []),
     {
         title: page.props.locale === 'es' ? 'Favoritos' : 'Favorites',
         href: favorites().url,
@@ -111,7 +121,7 @@ const mainNavItems = computed<NavItem[]>(() => [
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             </SidebarMenu>
-            <SidebarMenu>
+            <SidebarMenu v-if="hasTeams">
                 <SidebarMenuItem>
                     <TeamSwitcher />
                 </SidebarMenuItem>

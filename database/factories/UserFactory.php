@@ -39,11 +39,11 @@ class UserFactory extends Factory
     }
 
     /**
-     * Configure the model factory.
+     * Create a personal team for the user, mirroring the become-a-landlord flow.
      */
-    public function configure(): static
+    public function withPersonalTeam(): static
     {
-        return $this->afterCreating(function ($user) {
+        return $this->afterCreating(function (User $user) {
             $team = Team::factory()->personal()->create([
                 'name' => $user->name."'s Team",
             ]);

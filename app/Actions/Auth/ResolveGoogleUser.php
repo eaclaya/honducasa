@@ -2,7 +2,6 @@
 
 namespace App\Actions\Auth;
 
-use App\Actions\Teams\CreateTeam;
 use App\Enums\IdentityProvider;
 use App\Models\OauthIdentity;
 use App\Models\User;
@@ -13,8 +12,6 @@ use Laravel\Socialite\AbstractUser;
 
 class ResolveGoogleUser
 {
-    public function __construct(private CreateTeam $createTeam) {}
-
     public function handle(AbstractUser $googleUser): User
     {
         $subject = trim((string) $googleUser->getId());
@@ -58,8 +55,6 @@ class ResolveGoogleUser
             ]);
 
             $user->forceFill(['email_verified_at' => now()])->save();
-
-            $this->createTeam->handle($user, $user->name."'s Team", isPersonal: true);
 
             $user->oauthIdentities()->create([
                 'provider' => IdentityProvider::Google,

@@ -37,6 +37,7 @@ import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { getInitials } from '@/composables/useInitials';
 import { toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
+import { dashboard as userDashboard } from '@/routes/user';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
 type Props = {
@@ -52,8 +53,12 @@ const auth = computed(() => page.props.auth);
 const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
 
 const dashboardUrl = computed(() =>
-    page.props.currentTeam ? dashboard(page.props.currentTeam.slug).url : '/',
+    page.props.currentTeam
+        ? dashboard(page.props.currentTeam.slug).url
+        : userDashboard().url,
 );
+
+const hasTeams = computed(() => page.props.teams.length > 0);
 
 const activeItemStyles =
     'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
@@ -271,7 +276,7 @@ const rightNavItems: NavItem[] = [
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <TeamSwitcher :in-header="true" />
+                    <TeamSwitcher v-if="hasTeams" :in-header="true" />
                 </div>
             </div>
         </div>

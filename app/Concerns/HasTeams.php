@@ -8,6 +8,7 @@ use App\Enums\TeamPermission;
 use App\Enums\TeamRole;
 use App\Models\Membership;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -94,6 +95,15 @@ trait HasTeams
     }
 
     /**
+     * Clear the user's current team.
+     */
+    public function forgetCurrentTeam(): void
+    {
+        $this->update(['current_team_id' => null]);
+        $this->setRelation('currentTeam', null);
+    }
+
+    /**
      * Determine if the user belongs to the given team.
      */
     public function belongsToTeam(Team $team): bool
@@ -176,6 +186,24 @@ trait HasTeams
             canCreateInvitation: $role?->hasPermission(TeamPermission::CreateInvitation) ?? false,
             canCancelInvitation: $role?->hasPermission(TeamPermission::CancelInvitation) ?? false,
         );
+    }
+
+    /**
+     * Get pending, unexpired team invitations sent to the user's email address.
+     *
+     * @return Collection<int, TeamInvitation>
+     */
+    public function pendingTeamInvitations(): Collection
+    {
+        return TeamInvitation::query()
+            ->with(['inviter', 'team'])
+            ->whereRaw('LOWER(email) = ?', [strtolower($this->email)])
+            ->whereNull('accepted_at')
+            ->where(fn ($query) => $query
+                ->whereNull('expires_at')
+                ->orWhere('expires_at', '>=', now()))
+            ->latest()
+            ->get();
     }
 
     public function fallbackTeam(?Team $excluding = null): ?Team

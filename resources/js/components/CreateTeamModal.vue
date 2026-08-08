@@ -17,6 +17,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { store } from '@/routes/teams';
 
+withDefaults(
+    defineProps<{
+        publish?: boolean;
+    }>(),
+    {
+        publish: false,
+    },
+);
+
 const open = ref(false);
 const formKey = ref(0);
 
@@ -46,6 +55,7 @@ function handleOpenChange(value: boolean) {
                 v-slot="{ errors, processing }"
                 @success="open = false"
             >
+                <input v-if="publish" type="hidden" name="publish" value="1" />
                 <DialogHeader>
                     <DialogTitle>{{
                         tr('Crea un nuevo equipo', 'Create a new team')

@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Actions\Auth\ResolveGoogleUser;
+use App\Actions\Teams\AcceptTeamInvitation;
 use App\Http\Controllers\Controller;
+use App\Models\TeamInvitation;
+use App\Models\User;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,11 +37,37 @@ class GoogleCallbackController extends Controller
 
         Auth::login($user);
         $request->session()->regenerate();
-        $request->session()->forget('auth.google.invitation');
 
-        $team = $user->currentTeam()->firstOrFail();
+        $this->acceptPendingInvitation($request, $user);
 
-        return redirect()->intended(route('dashboard', ['current_team' => $team->slug]));
+        $team = $user->currentTeam;
+
+        return redirect()->intended($team
+            ? route('dashboard', ['current_team' => $team->slug])
+            : route('user.dashboard'));
+    }
+
+    /**
+     * Accept the team invitation stashed before the OAuth redirect, if it is valid for this user.
+     */
+    private function acceptPendingInvitation(Request $request, User $user): void
+    {
+        $code = $request->session()->pull('auth.google.invitation');
+
+        if (! is_string($code) || $code === '') {
+            return;
+        }
+
+        $invitation = TeamInvitation::query()->where('code', $code)->first();
+
+        if ($invitation === null
+            || $invitation->isAccepted()
+            || $invitation->isExpired()
+            || strtolower($invitation->email) !== strtolower($user->email)) {
+            return;
+        }
+
+        app(AcceptTeamInvitation::class)->handle($user, $invitation);
     }
 
     private function failedRedirect(Request $request, string $message): RedirectResponse

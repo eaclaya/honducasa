@@ -33,7 +33,7 @@ test('registration screen includes team invitation context', function () {
     );
 });
 
-test('new users can register', function () {
+test('new users can register without getting a team', function () {
     $response = $this->post(route('register.store'), [
         'name' => 'Test User',
         'email' => 'test@example.com',
@@ -44,5 +44,7 @@ test('new users can register', function () {
     $this->assertAuthenticated();
 
     $user = User::where('email', 'test@example.com')->first();
-    $response->assertRedirect(route('dashboard'));
+    expect($user->teams()->count())->toBe(0);
+    expect($user->current_team_id)->toBeNull();
+    $response->assertRedirect('/dashboard');
 });

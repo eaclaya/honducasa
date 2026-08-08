@@ -25,10 +25,14 @@ const sidebarNavItems = computed<NavItem[]>(() => [
         title: tr('Seguridad', 'Security'),
         href: editSecurity(),
     },
-    {
-        title: tr('Equipos', 'Teams'),
-        href: teams(),
-    },
+    ...(page.props.teams.length > 0
+        ? [
+              {
+                  title: tr('Equipos', 'Teams'),
+                  href: teams(),
+              },
+          ]
+        : []),
     {
         title: tr('Apariencia', 'Appearance'),
         href: editAppearance(),

@@ -3,12 +3,15 @@
 namespace Database\Seeders;
 
 use App\Enums\Furnishing;
+use App\Enums\ListingStatus;
+use App\Enums\ListingType;
 use App\Enums\LocationPrecision;
 use App\Enums\LocationType;
 use App\Enums\PropertyType;
 use App\Models\Location;
 use App\Models\Property;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -18,6 +21,18 @@ class DemoPropertySeeder extends Seeder
     public const int PROPERTY_COUNT = 10_000;
 
     private const int INSERT_CHUNK_SIZE = 500;
+
+    /** @var list<string> */
+    private const array IMAGE_URLS = [
+        'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600585152915-d208bec867a1?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600566753051-f0b89df2dd90?auto=format&fit=crop&w=1200&q=80',
+    ];
 
     /**
      * Representative rental markets and their approximate city centers.
@@ -47,7 +62,7 @@ class DemoPropertySeeder extends Seeder
         $this->call(LocationSeeder::class);
 
         $owner = User::query()->where('email', 'demo@honducasa.test')->first()
-            ?? User::factory()->create([
+            ?? User::factory()->withPersonalTeam()->create([
                 'name' => 'HonduCasa Demo',
                 'email' => 'demo@honducasa.test',
             ]);
@@ -71,6 +86,8 @@ class DemoPropertySeeder extends Seeder
                     $market = $this->randomMarket($markets);
                     [$latitude, $longitude] = $this->randomPointNear($market);
                     $type = fake()->randomElement(PropertyType::cases());
+                    $listingType = fake()->boolean(78) ? ListingType::Rent : ListingType::Buy;
+                    $pricing = $this->listingPricing($market['city'], $type, $listingType);
                     $name = fake()->randomElement(['Casa', 'Apartamento', 'Residencia', 'Condominio', 'Estudio']).' '.fake()->streetName();
                     $timestamp = now();
 
@@ -79,6 +96,9 @@ class DemoPropertySeeder extends Seeder
                         'location_id' => $market['location_id'],
                         'created_by' => $owner->id,
                         'type' => $type->value,
+                        'listing_type' => $listingType->value,
+                        'status' => ListingStatus::Published->value,
+                        'published_at' => $timestamp,
                         'name' => $name,
                         'slug' => 'demo-'.Str::slug($market['city']).'-'.Str::lower(Str::random(12)),
                         'address_line' => fake()->streetAddress(),
@@ -92,6 +112,10 @@ class DemoPropertySeeder extends Seeder
                         'lot_area_m2' => fake()->optional(0.6)->numberBetween(75, 1_200),
                         'year_built' => fake()->optional(0.85)->numberBetween(1960, now()->year),
                         'furnishing' => fake()->randomElement(Furnishing::cases())->value,
+                        'price_amount' => $pricing['price_amount'],
+                        'currency' => $pricing['currency'],
+                        'deposit_amount' => $listingType === ListingType::Rent && fake()->boolean(85) ? $pricing['price_amount'] : null,
+                        'utilities_included' => $listingType === ListingType::Rent && fake()->boolean(18),
                         'description' => fake()->paragraphs(2, true),
                         'created_at' => $timestamp,
                         'updated_at' => $timestamp,
@@ -100,6 +124,8 @@ class DemoPropertySeeder extends Seeder
 
                 DB::table('properties')->insert($rows);
             }
+
+            $this->seedPrimaryImages();
         });
 
         $this->command->info(self::PROPERTY_COUNT.' demo properties seeded across '.count(self::MARKETS).' Honduran markets.');
@@ -188,5 +214,69 @@ class DemoPropertySeeder extends Seeder
         $longitude = $market['longitude'] + (($distanceKm * sin($angle)) / (111.32 * cos(deg2rad($market['latitude']))));
 
         return [round($latitude, 7), round($longitude, 7)];
+    }
+
+    /**
+     * @return array{price_amount: int, currency: string}
+     */
+    private function listingPricing(string $city, PropertyType $type, ListingType $listingType): array
+    {
+        $baseRent = match ($type) {
+            PropertyType::Room => 4_500,
+            PropertyType::Studio => 7_000,
+            PropertyType::Apartment => 11_000,
+            PropertyType::Townhouse => 14_000,
+            PropertyType::House => 15_500,
+            PropertyType::Condominium => 18_000,
+        };
+
+        if ($city === 'Roatán') {
+            $rent = max(450, (int) round(($baseRent / 24.5) * fake()->randomFloat(2, 0.85, 1.8)));
+
+            return [
+                'price_amount' => $listingType === ListingType::Rent ? $rent : $rent * fake()->numberBetween(140, 220),
+                'currency' => 'USD',
+            ];
+        }
+
+        $cityMultiplier = match ($city) {
+            'Tegucigalpa' => 1.2,
+            'San Pedro Sula' => 1.15,
+            'Puerto Cortés', 'La Ceiba' => 1.05,
+            default => 0.85,
+        };
+
+        $rent = (int) (round(($baseRent * $cityMultiplier * fake()->randomFloat(2, 0.75, 1.45)) / 250) * 250);
+
+        return [
+            'price_amount' => $listingType === ListingType::Rent ? $rent : $rent * fake()->numberBetween(140, 220),
+            'currency' => 'HNL',
+        ];
+    }
+
+    private function seedPrimaryImages(): void
+    {
+        Property::query()
+            ->with('location:id,name')
+            ->where('slug', 'like', 'demo-%')
+            ->select(['id', 'location_id', 'name', 'slug'])
+            ->chunkById(self::INSERT_CHUNK_SIZE, function (Collection $properties): void {
+                $timestamp = now();
+                $rows = $properties->flatMap(function (Property $property) use ($timestamp): array {
+                    $startIndex = abs(crc32($property->slug)) % count(self::IMAGE_URLS);
+
+                    return array_map(fn (int $sortOrder) => [
+                        'property_id' => $property->id,
+                        'url' => self::IMAGE_URLS[($startIndex + $sortOrder) % count(self::IMAGE_URLS)],
+                        'alt_text' => ($property->name ?? 'Rental property').' in '.$property->location->name,
+                        'sort_order' => $sortOrder,
+                        'is_primary' => $sortOrder === 0,
+                        'created_at' => $timestamp,
+                        'updated_at' => $timestamp,
+                    ], range(0, 2));
+                })->all();
+
+                DB::table('property_images')->insert($rows);
+            });
     }
 }

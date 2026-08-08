@@ -37,7 +37,19 @@ test('login screen includes team invitation context', function () {
     );
 });
 
-test('users can authenticate using the login screen', function () {
+test('users with a team land on their team dashboard after login', function () {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $this->assertAuthenticated();
+    $response->assertRedirect(route('dashboard', ['current_team' => $user->currentTeam->slug]));
+});
+
+test('team-less users land on the user dashboard after login', function () {
     $user = User::factory()->create();
 
     $response = $this->post(route('login.store'), [
@@ -46,11 +58,11 @@ test('users can authenticate using the login screen', function () {
     ]);
 
     $this->assertAuthenticated();
-    $response->assertRedirect(route('dashboard'));
+    $response->assertRedirect('/dashboard');
 });
 
 test('passkey login response redirects to the current team dashboard', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->withPersonalTeam()->create();
 
     $request = Request::create(route('login', absolute: false), 'GET', server: [
         'HTTP_ACCEPT' => 'application/json',
