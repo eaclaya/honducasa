@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { Eye, LogOut, Pencil, Plus } from '@lucide/vue';
 import { ref } from 'vue';
 import CreateTeamModal from '@/components/CreateTeamModal.vue';
@@ -33,33 +33,42 @@ const openLeaveTeamDialog = (team: Team) => {
 };
 
 defineOptions({
-    layout: {
+    layout: (props: { locale?: string }) => ({
         breadcrumbs: [
             {
-                title: 'Teams',
+                title: props.locale === 'es' ? 'Equipos' : 'Teams',
                 href: index(),
             },
         ],
-    },
+    }),
 });
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 </script>
 
 <template>
-    <Head title="Teams" />
+    <Head :title="tr('Equipos', 'Teams')" />
 
-    <h1 class="sr-only">Teams</h1>
+    <h1 class="sr-only">{{ tr('Equipos', 'Teams') }}</h1>
 
     <div class="flex flex-col space-y-6">
         <div class="flex items-center justify-between">
             <Heading
                 variant="small"
-                title="Teams"
-                description="Manage your teams and team memberships"
+                :title="tr('Equipos', 'Teams')"
+                :description="
+                    tr(
+                        'Administra tus equipos y membresías',
+                        'Manage your teams and team memberships',
+                    )
+                "
             />
 
             <CreateTeamModal>
                 <Button data-test="teams-new-team-button">
-                    <Plus /> New team
+                    <Plus /> {{ tr('Nuevo equipo', 'New team') }}
                 </Button>
             </CreateTeamModal>
         </div>
@@ -99,7 +108,9 @@ defineOptions({
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>Leave team</p>
+                                <p>
+                                    {{ tr('Abandonar equipo', 'Leave team') }}
+                                </p>
                             </TooltipContent>
                         </Tooltip>
 
@@ -117,7 +128,7 @@ defineOptions({
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>View team</p>
+                                <p>{{ tr('Ver equipo', 'View team') }}</p>
                             </TooltipContent>
                         </Tooltip>
 
@@ -135,7 +146,7 @@ defineOptions({
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>Edit team</p>
+                                <p>{{ tr('Editar equipo', 'Edit team') }}</p>
                             </TooltipContent>
                         </Tooltip>
                     </div>
@@ -146,7 +157,12 @@ defineOptions({
                 v-if="teams.length === 0"
                 class="py-8 text-center text-muted-foreground"
             >
-                You don't belong to any teams yet.
+                {{
+                    tr(
+                        'Aún no perteneces a ningún equipo.',
+                        "You don't belong to any teams yet.",
+                    )
+                }}
             </p>
         </div>
     </div>

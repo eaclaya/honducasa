@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +27,10 @@ const emit = defineEmits<{
 
 const processing = ref(false);
 
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
+
 const cancelInvitation = () => {
     if (!props.invitation) {
         return;
@@ -44,9 +48,16 @@ const cancelInvitation = () => {
     <Dialog :open="props.open" @update:open="emit('update:open', $event)">
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Cancel invitation</DialogTitle>
+                <DialogTitle>{{
+                    tr('Cancelar invitación', 'Cancel invitation')
+                }}</DialogTitle>
                 <DialogDescription>
-                    Are you sure you want to cancel the invitation for
+                    {{
+                        tr(
+                            '¿Estás seguro de que quieres cancelar la invitación para',
+                            'Are you sure you want to cancel the invitation for',
+                        )
+                    }}
                     <strong>{{ props.invitation?.email }}</strong
                     >?
                 </DialogDescription>
@@ -54,7 +65,9 @@ const cancelInvitation = () => {
 
             <DialogFooter class="gap-2">
                 <DialogClose as-child>
-                    <Button variant="secondary"> Keep invitation </Button>
+                    <Button variant="secondary">{{
+                        tr('Mantener invitación', 'Keep invitation')
+                    }}</Button>
                 </DialogClose>
 
                 <Button
@@ -63,7 +76,7 @@ const cancelInvitation = () => {
                     :disabled="processing"
                     @click="cancelInvitation"
                 >
-                    Cancel invitation
+                    {{ tr('Cancelar invitación', 'Cancel invitation') }}
                 </Button>
             </DialogFooter>
         </DialogContent>

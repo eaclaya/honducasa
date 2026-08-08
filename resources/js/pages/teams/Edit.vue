@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form, Head, router } from '@inertiajs/vue3';
+import { Form, Head, router, usePage } from '@inertiajs/vue3';
 import { ChevronDown, Mail, UserPlus, X } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import CancelInvitationModal from '@/components/CancelInvitationModal.vue';
@@ -47,10 +47,10 @@ type Props = {
 const props = defineProps<Props>();
 
 defineOptions({
-    layout: (props: { team: Team }) => ({
+    layout: (props: { team: Team; locale?: string }) => ({
         breadcrumbs: [
             {
-                title: 'Teams',
+                title: props.locale === 'es' ? 'Equipos' : 'Teams',
                 href: index(),
             },
             {
@@ -60,6 +60,10 @@ defineOptions({
         ],
     }),
 });
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 
 const { getInitials } = useInitials();
 
@@ -72,8 +76,8 @@ const invitationToCancel = ref<TeamInvitation | null>(null);
 
 const pageTitle = computed(() =>
     props.permissions.canUpdateTeam
-        ? `Edit ${props.team.name}`
-        : `View ${props.team.name}`,
+        ? tr(`Editar ${props.team.name}`, `Edit ${props.team.name}`)
+        : tr(`Ver ${props.team.name}`, `View ${props.team.name}`),
 );
 
 const updateMemberRole = (member: TeamMember, newRole: string) => {
@@ -104,8 +108,13 @@ const confirmCancelInvitation = (invitation: TeamInvitation) => {
         <div v-if="permissions.canUpdateTeam" class="space-y-6">
             <Heading
                 variant="small"
-                title="Team settings"
-                description="Update your team name and settings"
+                :title="tr('Configuración del equipo', 'Team settings')"
+                :description="
+                    tr(
+                        'Actualiza el nombre y la configuración de tu equipo',
+                        'Update your team name and settings',
+                    )
+                "
             />
 
             <Form
@@ -114,7 +123,9 @@ const confirmCancelInvitation = (invitation: TeamInvitation) => {
                 v-slot="{ errors, processing }"
             >
                 <div class="grid gap-2">
-                    <Label for="name">Team name</Label>
+                    <Label for="name">{{
+                        tr('Nombre del equipo', 'Team name')
+                    }}</Label>
                     <Input
                         id="name"
                         name="name"
@@ -131,7 +142,7 @@ const confirmCancelInvitation = (invitation: TeamInvitation) => {
                         data-test="team-save-button"
                         :disabled="processing"
                     >
-                        Save
+                        {{ tr('Guardar', 'Save') }}
                     </Button>
                 </div>
             </Form>
@@ -146,10 +157,13 @@ const confirmCancelInvitation = (invitation: TeamInvitation) => {
             <div class="flex items-center justify-between">
                 <Heading
                     variant="small"
-                    title="Team members"
+                    :title="tr('Miembros del equipo', 'Team members')"
                     :description="
                         permissions.canCreateInvitation
-                            ? 'Manage who belongs to this team'
+                            ? tr(
+                                  'Administra quién pertenece a este equipo',
+                                  'Manage who belongs to this team',
+                              )
                             : ''
                     "
                 />
@@ -159,7 +173,7 @@ const confirmCancelInvitation = (invitation: TeamInvitation) => {
                     data-test="invite-member-button"
                     @click="inviteDialogOpen = true"
                 >
-                    <UserPlus /> Invite member
+                    <UserPlus /> {{ tr('Invitar miembro', 'Invite member') }}
                 </Button>
             </div>
 
@@ -245,7 +259,14 @@ const confirmCancelInvitation = (invitation: TeamInvitation) => {
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p>Remove member</p>
+                                    <p>
+                                        {{
+                                            tr(
+                                                'Eliminar miembro',
+                                                'Remove member',
+                                            )
+                                        }}
+                                    </p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
@@ -258,8 +279,13 @@ const confirmCancelInvitation = (invitation: TeamInvitation) => {
         <div v-if="invitations.length > 0" class="space-y-6">
             <Heading
                 variant="small"
-                title="Pending invitations"
-                description="Invitations that haven't been accepted yet"
+                :title="tr('Invitaciones pendientes', 'Pending invitations')"
+                :description="
+                    tr(
+                        'Invitaciones que aún no han sido aceptadas',
+                        `Invitations that haven't been accepted yet`,
+                    )
+                "
             />
 
             <div class="space-y-3">
@@ -298,7 +324,14 @@ const confirmCancelInvitation = (invitation: TeamInvitation) => {
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                                <p>Cancel invitation</p>
+                                <p>
+                                    {{
+                                        tr(
+                                            'Cancelar invitación',
+                                            'Cancel invitation',
+                                        )
+                                    }}
+                                </p>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
@@ -313,8 +346,13 @@ const confirmCancelInvitation = (invitation: TeamInvitation) => {
         >
             <Heading
                 variant="small"
-                title="Delete team"
-                description="Permanently delete your team"
+                :title="tr('Eliminar equipo', 'Delete team')"
+                :description="
+                    tr(
+                        'Elimina tu equipo de forma permanente',
+                        'Permanently delete your team',
+                    )
+                "
             />
             <div
                 class="space-y-4 rounded-lg border border-red-100 bg-red-50 p-4 dark:border-red-200/10 dark:bg-red-700/10"
@@ -322,16 +360,23 @@ const confirmCancelInvitation = (invitation: TeamInvitation) => {
                 <div
                     class="relative space-y-0.5 text-red-600 dark:text-red-100"
                 >
-                    <p class="font-medium">Warning</p>
+                    <p class="font-medium">
+                        {{ tr('Advertencia', 'Warning') }}
+                    </p>
                     <p class="text-sm">
-                        Please proceed with caution, this cannot be undone.
+                        {{
+                            tr(
+                                'Procede con precaución, esta acción no se puede deshacer.',
+                                'Please proceed with caution, this cannot be undone.',
+                            )
+                        }}
                     </p>
                 </div>
                 <Button
                     data-test="delete-team-button"
                     variant="destructive"
                     @click="deleteDialogOpen = true"
-                    >Delete team</Button
+                    >{{ tr('Eliminar equipo', 'Delete team') }}</Button
                 >
             </div>
         </div>

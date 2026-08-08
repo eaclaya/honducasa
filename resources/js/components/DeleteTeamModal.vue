@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form } from '@inertiajs/vue3';
+import { Form, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,10 @@ const emit = defineEmits<{
 const confirmationName = ref('');
 const formKey = ref(0);
 
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
+
 const canDeleteTeam = computed(() => {
     return confirmationName.value === props.team.name;
 });
@@ -55,10 +59,16 @@ const handleOpenChange = (nextOpen: boolean) => {
                 @success="handleOpenChange(false)"
             >
                 <DialogHeader>
-                    <DialogTitle>Are you sure?</DialogTitle>
+                    <DialogTitle>{{
+                        tr('¿Estás seguro?', 'Are you sure?')
+                    }}</DialogTitle>
                     <DialogDescription>
-                        This action cannot be undone. This will permanently
-                        delete the team
+                        {{
+                            tr(
+                                'Esta acción no se puede deshacer. Se eliminará permanentemente el equipo',
+                                'This action cannot be undone. This will permanently delete the team',
+                            )
+                        }}
                         <strong>"{{ props.team.name }}"</strong>.
                     </DialogDescription>
                 </DialogHeader>
@@ -66,15 +76,21 @@ const handleOpenChange = (nextOpen: boolean) => {
                 <div class="space-y-4 py-4">
                     <div class="grid gap-2">
                         <Label for="confirmation-name">
-                            Type
-                            <strong>"{{ props.team.name }}"</strong> to confirm
+                            {{ tr('Escribe', 'Type') }}
+                            <strong>"{{ props.team.name }}"</strong>
+                            {{ tr('para confirmar', 'to confirm') }}
                         </Label>
                         <Input
                             id="confirmation-name"
                             name="name"
                             data-test="delete-team-name"
                             v-model="confirmationName"
-                            placeholder="Enter team name"
+                            :placeholder="
+                                tr(
+                                    'Ingresa el nombre del equipo',
+                                    'Enter team name',
+                                )
+                            "
                             autocomplete="off"
                         />
                         <InputError :message="errors.name" />
@@ -83,7 +99,9 @@ const handleOpenChange = (nextOpen: boolean) => {
 
                 <DialogFooter class="gap-2">
                     <DialogClose as-child>
-                        <Button variant="secondary"> Cancel </Button>
+                        <Button variant="secondary">{{
+                            tr('Cancelar', 'Cancel')
+                        }}</Button>
                     </DialogClose>
 
                     <Button
@@ -92,7 +110,7 @@ const handleOpenChange = (nextOpen: boolean) => {
                         type="submit"
                         :disabled="!canDeleteTeam || processing"
                     >
-                        Delete team
+                        {{ tr('Eliminar equipo', 'Delete team') }}
                     </Button>
                 </DialogFooter>
             </Form>

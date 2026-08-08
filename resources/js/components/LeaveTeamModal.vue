@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +26,10 @@ const emit = defineEmits<{
 
 const processing = ref(false);
 
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
+
 const leaveTeam = () => {
     if (!props.team) {
         return;
@@ -43,9 +47,16 @@ const leaveTeam = () => {
     <Dialog :open="props.open" @update:open="emit('update:open', $event)">
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Leave team</DialogTitle>
+                <DialogTitle>{{
+                    tr('Abandonar equipo', 'Leave team')
+                }}</DialogTitle>
                 <DialogDescription>
-                    Are you sure you want to leave
+                    {{
+                        tr(
+                            '¿Estás seguro de que quieres abandonar',
+                            'Are you sure you want to leave',
+                        )
+                    }}
                     <strong>{{ props.team?.name }}</strong
                     >?
                 </DialogDescription>
@@ -53,7 +64,9 @@ const leaveTeam = () => {
 
             <DialogFooter class="gap-2">
                 <DialogClose as-child>
-                    <Button variant="secondary"> Cancel </Button>
+                    <Button variant="secondary">{{
+                        tr('Cancelar', 'Cancel')
+                    }}</Button>
                 </DialogClose>
 
                 <Button
@@ -62,7 +75,7 @@ const leaveTeam = () => {
                     :disabled="processing"
                     @click="leaveTeam"
                 >
-                    Leave team
+                    {{ tr('Abandonar equipo', 'Leave team') }}
                 </Button>
             </DialogFooter>
         </DialogContent>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +27,10 @@ const emit = defineEmits<{
 
 const processing = ref(false);
 
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
+
 const removeMember = () => {
     if (!props.member) {
         return;
@@ -44,16 +48,26 @@ const removeMember = () => {
     <Dialog :open="props.open" @update:open="emit('update:open', $event)">
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Remove team member</DialogTitle>
+                <DialogTitle>{{
+                    tr('Eliminar miembro del equipo', 'Remove team member')
+                }}</DialogTitle>
                 <DialogDescription>
-                    Are you sure you want to remove
-                    <strong>{{ props.member?.name }}</strong> from this team?
+                    {{
+                        tr(
+                            '¿Estás seguro de que quieres eliminar a',
+                            'Are you sure you want to remove',
+                        )
+                    }}
+                    <strong>{{ props.member?.name }}</strong>
+                    {{ tr('de este equipo?', 'from this team?') }}
                 </DialogDescription>
             </DialogHeader>
 
             <DialogFooter class="gap-2">
                 <DialogClose as-child>
-                    <Button variant="secondary"> Cancel </Button>
+                    <Button variant="secondary">{{
+                        tr('Cancelar', 'Cancel')
+                    }}</Button>
                 </DialogClose>
 
                 <Button
@@ -62,7 +76,7 @@ const removeMember = () => {
                     :disabled="processing"
                     @click="removeMember"
                 >
-                    Remove member
+                    {{ tr('Eliminar miembro', 'Remove member') }}
                 </Button>
             </DialogFooter>
         </DialogContent>
