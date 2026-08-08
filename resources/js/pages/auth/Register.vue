@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form, Head } from '@inertiajs/vue3';
+import { Form, Head, usePage } from '@inertiajs/vue3';
 import GoogleAuthButton from '@/components/GoogleAuthButton.vue';
 import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
@@ -19,15 +19,22 @@ defineProps<{
 }>();
 
 defineOptions({
-    layout: {
-        title: 'Create an account',
-        description: 'Enter your details below to create your account',
-    },
+    layout: (props: { locale?: string }) => ({
+        title: props.locale === 'es' ? 'Crea una cuenta' : 'Create an account',
+        description:
+            props.locale === 'es'
+                ? 'Ingresa tus datos para crear tu cuenta'
+                : 'Enter your details below to create your account',
+    }),
 });
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 </script>
 
 <template>
-    <Head title="Register" />
+    <Head :title="tr('Registrarse', 'Register')" />
 
     <TeamInvitationAlert
         v-if="teamInvitation"
@@ -42,7 +49,12 @@ defineOptions({
             <span
                 class="relative z-10 bg-background px-2 text-muted-foreground"
             >
-                Or create an account manually
+                {{
+                    tr(
+                        'O crea una cuenta manualmente',
+                        'Or create an account manually',
+                    )
+                }}
             </span>
             <span class="absolute inset-x-0 top-1/2 border-t" />
         </div>
@@ -56,7 +68,7 @@ defineOptions({
     >
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="name">Name</Label>
+                <Label for="name">{{ tr('Nombre', 'Name') }}</Label>
                 <Input
                     id="name"
                     type="text"
@@ -65,13 +77,15 @@ defineOptions({
                     :tabindex="1"
                     autocomplete="name"
                     name="name"
-                    placeholder="Full name"
+                    :placeholder="tr('Nombre completo', 'Full name')"
                 />
                 <InputError :message="errors.name" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">{{
+                    tr('Correo electrónico', 'Email address')
+                }}</Label>
                 <Input
                     id="email"
                     type="email"
@@ -85,28 +99,32 @@ defineOptions({
             </div>
 
             <div class="grid gap-2">
-                <Label for="password">Password</Label>
+                <Label for="password">{{ tr('Contraseña', 'Password') }}</Label>
                 <PasswordInput
                     id="password"
                     required
                     :tabindex="3"
                     autocomplete="new-password"
                     name="password"
-                    placeholder="Password"
+                    :placeholder="tr('Contraseña', 'Password')"
                     :passwordrules="passwordRules"
                 />
                 <InputError :message="errors.password" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="password_confirmation">Confirm password</Label>
+                <Label for="password_confirmation">{{
+                    tr('Confirmar contraseña', 'Confirm password')
+                }}</Label>
                 <PasswordInput
                     id="password_confirmation"
                     required
                     :tabindex="4"
                     autocomplete="new-password"
                     name="password_confirmation"
-                    placeholder="Confirm password"
+                    :placeholder="
+                        tr('Confirmar contraseña', 'Confirm password')
+                    "
                     :passwordrules="passwordRules"
                 />
                 <InputError :message="errors.password_confirmation" />
@@ -120,12 +138,12 @@ defineOptions({
                 data-test="register-user-button"
             >
                 <Spinner v-if="processing" />
-                Create account
+                {{ tr('Crear cuenta', 'Create account') }}
             </Button>
         </div>
 
         <div class="text-center text-sm text-muted-foreground">
-            Already have an account?
+            {{ tr('¿Ya tienes una cuenta?', 'Already have an account?') }}
             <TextLink
                 :href="
                     teamInvitation
@@ -140,7 +158,7 @@ defineOptions({
                 :tabindex="6"
                 data-test="team-invitation-login-link"
             >
-                Log in
+                {{ tr('Inicia sesión', 'Log in') }}
             </TextLink>
         </div>
     </Form>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
 import { Info } from '@lucide/vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { TeamInvitationContext } from '@/types';
@@ -8,7 +9,17 @@ type Props = {
     action: 'Log in' | 'Register';
 };
 
-defineProps<Props>();
+const props = defineProps<Props>();
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
+
+const invitationMessage = (): string =>
+    tr(
+        `${props.action === 'Log in' ? 'Inicia sesión' : 'Regístrate'} para unirte al equipo "${props.invitation.teamName}".`,
+        `${props.action} to join the "${props.invitation.teamName}" team.`,
+    );
 </script>
 
 <template>
@@ -18,7 +29,7 @@ defineProps<Props>();
         >
             <Info class="size-4" />
             <AlertDescription class="text-blue-900 dark:text-blue-100">
-                {{ action }} to join the "{{ invitation.teamName }}" team.
+                {{ invitationMessage() }}
             </AlertDescription>
         </Alert>
     </div>

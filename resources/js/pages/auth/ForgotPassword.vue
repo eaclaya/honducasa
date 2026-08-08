@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form, Head } from '@inertiajs/vue3';
+import { Form, Head, usePage } from '@inertiajs/vue3';
 import InputError from '@/components/InputError.vue';
 import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
@@ -10,19 +10,29 @@ import { login } from '@/routes';
 import { email } from '@/routes/password';
 
 defineOptions({
-    layout: {
-        title: 'Forgot password',
-        description: 'Enter your email to receive a password reset link',
-    },
+    layout: (props: { locale?: string }) => ({
+        title:
+            props.locale === 'es'
+                ? '¿Olvidaste tu contraseña?'
+                : 'Forgot password',
+        description:
+            props.locale === 'es'
+                ? 'Ingresa tu correo electrónico para recibir un enlace de restablecimiento'
+                : 'Enter your email to receive a password reset link',
+    }),
 });
 
 defineProps<{
     status?: string;
 }>();
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 </script>
 
 <template>
-    <Head title="Forgot password" />
+    <Head :title="tr('Recuperar contraseña', 'Forgot password')" />
 
     <div
         v-if="status"
@@ -34,7 +44,9 @@ defineProps<{
     <div class="space-y-6">
         <Form v-bind="email.form()" v-slot="{ errors, processing }">
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">{{
+                    tr('Correo electrónico', 'Email address')
+                }}</Label>
                 <Input
                     id="email"
                     type="email"
@@ -53,14 +65,21 @@ defineProps<{
                     data-test="email-password-reset-link-button"
                 >
                     <Spinner v-if="processing" />
-                    Email password reset link
+                    {{
+                        tr(
+                            'Enviar enlace de restablecimiento',
+                            'Email password reset link',
+                        )
+                    }}
                 </Button>
             </div>
         </Form>
 
         <div class="space-x-1 text-center text-sm text-muted-foreground">
-            <span>Or, return to</span>
-            <TextLink :href="login()">log in</TextLink>
+            <span>{{ tr('O regresa a', 'Or, return to') }}</span>
+            <TextLink :href="login()">{{
+                tr('iniciar sesión', 'log in')
+            }}</TextLink>
         </div>
     </div>
 </template>

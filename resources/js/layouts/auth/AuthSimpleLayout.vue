@@ -1,18 +1,34 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+import { ArrowLeft } from '@lucide/vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
+import { Button } from '@/components/ui/button';
 import { home } from '@/routes';
 
 defineProps<{
     title?: string;
     description?: string;
 }>();
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 </script>
 
 <template>
     <div
-        class="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10"
+        class="relative flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10"
     >
+        <Button
+            as-child
+            variant="ghost"
+            class="absolute top-4 left-4 text-muted-foreground md:top-6 md:left-6"
+        >
+            <Link :href="home()" data-test="back-to-home-link">
+                <ArrowLeft class="size-4" />
+                {{ tr('Volver al inicio', 'Back to home') }}
+            </Link>
+        </Button>
         <div class="w-full max-w-sm">
             <div class="flex flex-col gap-8">
                 <div class="flex flex-col items-center gap-4">

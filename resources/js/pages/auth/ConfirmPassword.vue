@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form, Head } from '@inertiajs/vue3';
+import { Form, Head, usePage } from '@inertiajs/vue3';
 import {
     index as confirmOptions,
     store as confirmStore,
@@ -13,25 +13,36 @@ import { Spinner } from '@/components/ui/spinner';
 import { store } from '@/routes/password/confirm';
 
 defineOptions({
-    layout: {
-        title: 'Confirm password',
+    layout: (props: { locale?: string }) => ({
+        title:
+            props.locale === 'es'
+                ? 'Confirma tu contraseña'
+                : 'Confirm password',
         description:
-            'This is a secure area of the application. Please confirm your password before continuing.',
-    },
+            props.locale === 'es'
+                ? 'Esta es un área segura de la aplicación. Por favor, confirma tu contraseña antes de continuar.'
+                : 'This is a secure area of the application. Please confirm your password before continuing.',
+    }),
 });
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 </script>
 
 <template>
-    <Head title="Confirm password" />
+    <Head :title="tr('Confirmar contraseña', 'Confirm password')" />
 
     <PasskeyVerify
         :routes="{
             options: confirmOptions(),
             submit: confirmStore(),
         }"
-        label="Confirm with passkey"
-        loading-label="Confirming..."
-        separator="Or confirm with password"
+        :label="tr('Confirma con tu llave de acceso', 'Confirm with passkey')"
+        :loading-label="tr('Confirmando...', 'Confirming...')"
+        :separator="
+            tr('O confirma con tu contraseña', 'Or confirm with password')
+        "
     />
 
     <Form
@@ -41,7 +52,9 @@ defineOptions({
     >
         <div class="space-y-6">
             <div class="grid gap-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{{
+                    tr('Contraseña', 'Password')
+                }}</Label>
                 <PasswordInput
                     id="password"
                     name="password"
@@ -61,7 +74,7 @@ defineOptions({
                     data-test="confirm-password-button"
                 >
                     <Spinner v-if="processing" />
-                    Confirm password
+                    {{ tr('Confirmar contraseña', 'Confirm password') }}
                 </Button>
             </div>
         </div>

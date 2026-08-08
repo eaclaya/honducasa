@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form, Head } from '@inertiajs/vue3';
+import { Form, Head, usePage } from '@inertiajs/vue3';
 import GoogleAuthButton from '@/components/GoogleAuthButton.vue';
 import InputError from '@/components/InputError.vue';
 import PasskeyVerify from '@/components/PasskeyVerify.vue';
@@ -17,10 +17,16 @@ import { request } from '@/routes/password';
 import type { TeamInvitationContext } from '@/types';
 
 defineOptions({
-    layout: {
-        title: 'Log in to your account',
-        description: 'Enter your email and password below to log in',
-    },
+    layout: (props: { locale?: string }) => ({
+        title:
+            props.locale === 'es'
+                ? 'Inicia sesión en tu cuenta'
+                : 'Log in to your account',
+        description:
+            props.locale === 'es'
+                ? 'Ingresa tu correo electrónico y contraseña para iniciar sesión'
+                : 'Enter your email and password below to log in',
+    }),
 });
 
 defineProps<{
@@ -28,10 +34,14 @@ defineProps<{
     canResetPassword: boolean;
     teamInvitation?: TeamInvitationContext | null;
 }>();
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 </script>
 
 <template>
-    <Head title="Log in" />
+    <Head :title="tr('Iniciar sesión', 'Log in')" />
 
     <div
         v-if="status"
@@ -53,7 +63,7 @@ defineProps<{
             <span
                 class="relative z-10 bg-background px-2 text-muted-foreground"
             >
-                Or continue manually
+                {{ tr('O continúa manualmente', 'Or continue manually') }}
             </span>
             <span class="absolute inset-x-0 top-1/2 border-t" />
         </div>
@@ -69,7 +79,9 @@ defineProps<{
     >
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">{{
+                    tr('Correo electrónico', 'Email address')
+                }}</Label>
                 <Input
                     id="email"
                     type="email"
@@ -85,14 +97,18 @@ defineProps<{
 
             <div class="grid gap-2">
                 <div class="flex items-center justify-between">
-                    <Label for="password">Password</Label>
+                    <Label for="password">{{
+                        tr('Contraseña', 'Password')
+                    }}</Label>
                     <TextLink
                         v-if="canResetPassword"
                         :href="request()"
                         class="text-sm"
                         :tabindex="5"
                     >
-                        Forgot password?
+                        {{
+                            tr('¿Olvidaste tu contraseña?', 'Forgot password?')
+                        }}
                     </TextLink>
                 </div>
                 <PasswordInput
@@ -101,7 +117,7 @@ defineProps<{
                     required
                     :tabindex="2"
                     autocomplete="current-password"
-                    placeholder="Password"
+                    :placeholder="tr('Contraseña', 'Password')"
                 />
                 <InputError :message="errors.password" />
             </div>
@@ -109,7 +125,7 @@ defineProps<{
             <div class="flex items-center justify-between">
                 <Label for="remember" class="flex items-center space-x-3">
                     <Checkbox id="remember" name="remember" :tabindex="3" />
-                    <span>Remember me</span>
+                    <span>{{ tr('Recuérdame', 'Remember me') }}</span>
                 </Label>
             </div>
 
@@ -121,12 +137,12 @@ defineProps<{
                 data-test="login-button"
             >
                 <Spinner v-if="processing" />
-                Log in
+                {{ tr('Iniciar sesión', 'Log in') }}
             </Button>
         </div>
 
         <div class="text-center text-sm text-muted-foreground">
-            Don't have an account?
+            {{ tr('¿No tienes una cuenta?', "Don't have an account?") }}
             <TextLink
                 :href="
                     register({
@@ -138,7 +154,7 @@ defineProps<{
                 :tabindex="5"
                 data-test="register-link"
             >
-                Sign up
+                {{ tr('Regístrate', 'Sign up') }}
             </TextLink>
         </div>
     </Form>

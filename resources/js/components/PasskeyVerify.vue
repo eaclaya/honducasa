@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { UrlMethodPair } from '@inertiajs/core';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { usePasskeyVerify } from '@laravel/passkeys/vue';
 import { KeyRound } from '@lucide/vue';
 import InputError from '@/components/InputError.vue';
@@ -19,6 +19,10 @@ type Props = {
 };
 
 const props = defineProps<Props>();
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 
 const { verify, isLoading, error, isSupported } = usePasskeyVerify({
     ...(props.routes
@@ -49,8 +53,13 @@ const { verify, isLoading, error, isSupported } = usePasskeyVerify({
                 <KeyRound v-else class="h-4 w-4" />
                 {{
                     isLoading
-                        ? (props.loadingLabel ?? 'Authenticating...')
-                        : (props.label ?? 'Sign in with a passkey')
+                        ? (props.loadingLabel ??
+                          tr('Autenticando...', 'Authenticating...'))
+                        : (props.label ??
+                          tr(
+                              'Inicia sesión con una llave de acceso',
+                              'Sign in with a passkey',
+                          ))
                 }}
             </Button>
 
@@ -65,7 +74,13 @@ const { verify, isLoading, error, isSupported } = usePasskeyVerify({
             </div>
             <div class="relative flex justify-center text-xs uppercase">
                 <span class="bg-background px-2 text-muted-foreground">
-                    {{ props.separator ?? 'Or continue with email' }}
+                    {{
+                        props.separator ??
+                        tr(
+                            'O continúa con tu correo electrónico',
+                            'Or continue with email',
+                        )
+                    }}
                 </span>
             </div>
         </div>

@@ -1,0 +1,10 @@
+{
+    "The provided password was incorrect.": "La contraseña proporcionada es incorrecta.",
+    "The provided two factor authentication code was invalid.": "El código de autenticación de dos factores proporcionado no es válido.",
+    "The provided two factor recovery code was invalid.": "El código de recuperación de dos factores proporcionado no es válido.",
+    "Invalid credential format.": "El formato de la credencial no es válido.",
+    "Passkey registration session expired. Please try again.": "La sesión de registro de la llave de acceso ha expirado. Por favor, inténtalo de nuevo.",
+    "Passkey verification session expired. Please try again.": "La sesión de verificación de la llave de acceso ha expirado. Por favor, inténtalo de nuevo.",
+    "Google did not provide a verified email address.": "Google no proporcionó un correo electrónico verificado.",
+    "An account already uses this email. Sign in manually before connecting Google.": "Ya existe una cuenta con este correo electrónico. Inicia sesión manualmente antes de conectar Google."
+}

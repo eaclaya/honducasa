@@ -1,10 +1,15 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { redirect } from '@/routes/auth/google';
 
 defineProps<{
     invitation?: string;
 }>();
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 </script>
 
 <template>
@@ -39,6 +44,6 @@ defineProps<{
                 d="M12 6.01c1.47 0 2.79.5 3.83 1.5l2.87-2.88A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.96 5.52l3.35 2.62C7.18 7.77 9.39 6.01 12 6.01Z"
             />
         </svg>
-        Continue with Google
+        {{ tr('Continuar con Google', 'Continue with Google') }}
     </Button>
 </template>
