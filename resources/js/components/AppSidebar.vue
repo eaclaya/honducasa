@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid } from '@lucide/vue';
+import {
+    Bell,
+    Building2,
+    Compass,
+    Heart,
+    LayoutGrid,
+    MessageCircle,
+    Search,
+    ShieldAlert,
+} from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
-import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import TeamSwitcher from '@/components/TeamSwitcher.vue';
@@ -16,7 +24,14 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
+import { dashboard, home } from '@/routes';
+import { index as moderation } from '@/routes/admin/moderation';
+import { index as favorites } from '@/routes/favorites';
+import { index as listings } from '@/routes/listings';
+import { show as messages } from '@/routes/messages';
+import { index as notifications } from '@/routes/notifications';
+import { index as rentals } from '@/routes/rentals';
+import { index as savedSearches } from '@/routes/saved-searches';
 import type { NavItem } from '@/types';
 
 const page = usePage();
@@ -31,20 +46,57 @@ const mainNavItems = computed<NavItem[]>(() => [
         href: dashboardUrl.value,
         icon: LayoutGrid,
     },
+    {
+        title:
+            page.props.locale === 'es'
+                ? 'Explorar propiedades'
+                : 'Explore properties',
+        href: rentals().url,
+        icon: Compass,
+    },
+    {
+        title: page.props.locale === 'es' ? 'Mis propiedades' : 'My listings',
+        href: page.props.currentTeam
+            ? listings.url(page.props.currentTeam.slug)
+            : '/',
+        icon: Building2,
+    },
+    {
+        title: page.props.locale === 'es' ? 'Favoritos' : 'Favorites',
+        href: favorites().url,
+        icon: Heart,
+    },
+    {
+        title:
+            page.props.locale === 'es'
+                ? 'Búsquedas guardadas'
+                : 'Saved searches',
+        href: savedSearches().url,
+        icon: Search,
+    },
+    {
+        title: page.props.locale === 'es' ? 'Mensajes' : 'Messages',
+        href: messages().url,
+        icon: MessageCircle,
+        badge: page.props.unreadMessages,
+    },
+    {
+        title: page.props.locale === 'es' ? 'Notificaciones' : 'Notifications',
+        href: notifications().url,
+        icon: Bell,
+        badge: page.props.unreadNotifications,
+    },
+    ...(page.props.auth.user?.is_admin
+        ? [
+              {
+                  title:
+                      page.props.locale === 'es' ? 'Moderación' : 'Moderation',
+                  href: moderation().url,
+                  icon: ShieldAlert,
+              },
+          ]
+        : []),
 ]);
-
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
-    },
-];
 </script>
 
 <template>
@@ -53,7 +105,7 @@ const footerNavItems: NavItem[] = [
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" as-child>
-                        <Link :href="dashboardUrl">
+                        <Link :href="home()">
                             <AppLogo />
                         </Link>
                     </SidebarMenuButton>
@@ -71,7 +123,6 @@ const footerNavItems: NavItem[] = [
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
             <NavUser />
         </SidebarFooter>
     </Sidebar>
