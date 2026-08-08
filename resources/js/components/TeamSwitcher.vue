@@ -25,6 +25,8 @@ const props = withDefaults(
 );
 
 const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 const isMobile = ref(false);
 let mediaQuery: MediaQueryList | null = null;
 const updateIsMobile = () => {
@@ -119,7 +121,10 @@ onUnmounted(() => {
                                 : 'truncate font-semibold'
                         "
                     >
-                        {{ currentTeam?.name ?? 'Select team' }}
+                        {{
+                            currentTeam?.name ??
+                            tr('Seleccionar equipo', 'Select team')
+                        }}
                     </span>
                 </div>
                 <ChevronsUpDown
@@ -139,7 +144,7 @@ onUnmounted(() => {
             :side-offset="props.inHeader ? undefined : 4"
         >
             <DropdownMenuLabel class="text-xs text-muted-foreground">
-                Teams
+                {{ tr('Equipos', 'Teams') }}
             </DropdownMenuLabel>
             <DropdownMenuItem
                 v-for="team in teams"
@@ -162,7 +167,9 @@ onUnmounted(() => {
                     @select.prevent
                 >
                     <Plus :class="plusIconClass" />
-                    <span class="text-muted-foreground">New team</span>
+                    <span class="text-muted-foreground">{{
+                        tr('Nuevo equipo', 'New team')
+                    }}</span>
                 </DropdownMenuItem>
             </CreateTeamModal>
         </DropdownMenuContent>

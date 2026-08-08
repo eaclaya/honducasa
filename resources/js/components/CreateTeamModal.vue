@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form } from '@inertiajs/vue3';
+import { Form, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,10 @@ import { store } from '@/routes/teams';
 
 const open = ref(false);
 const formKey = ref(0);
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 
 function handleOpenChange(value: boolean) {
     open.value = value;
@@ -43,19 +47,28 @@ function handleOpenChange(value: boolean) {
                 @success="open = false"
             >
                 <DialogHeader>
-                    <DialogTitle>Create a new team</DialogTitle>
+                    <DialogTitle>{{
+                        tr('Crea un nuevo equipo', 'Create a new team')
+                    }}</DialogTitle>
                     <DialogDescription>
-                        Create a new team to collaborate with others.
+                        {{
+                            tr(
+                                'Crea un nuevo equipo para colaborar con otras personas.',
+                                'Create a new team to collaborate with others.',
+                            )
+                        }}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div class="grid gap-2">
-                    <Label for="name">Team name</Label>
+                    <Label for="name">{{
+                        tr('Nombre del equipo', 'Team name')
+                    }}</Label>
                     <Input
                         id="name"
                         name="name"
                         data-test="create-team-name"
-                        placeholder="My team"
+                        :placeholder="tr('Mi equipo', 'My team')"
                         required
                     />
                     <InputError :message="errors.name" />
@@ -63,7 +76,9 @@ function handleOpenChange(value: boolean) {
 
                 <DialogFooter class="gap-2">
                     <DialogClose as-child>
-                        <Button variant="secondary"> Cancel </Button>
+                        <Button variant="secondary">{{
+                            tr('Cancelar', 'Cancel')
+                        }}</Button>
                     </DialogClose>
 
                     <Button
@@ -71,7 +86,7 @@ function handleOpenChange(value: boolean) {
                         data-test="create-team-submit"
                         :disabled="processing"
                     >
-                        Create team
+                        {{ tr('Crear equipo', 'Create team') }}
                     </Button>
                 </DialogFooter>
             </Form>
