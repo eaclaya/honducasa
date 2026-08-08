@@ -13,30 +13,42 @@ import { edit } from '@/routes/profile';
 import { send } from '@/routes/verification';
 
 defineOptions({
-    layout: {
+    layout: (props: { locale?: string }) => ({
         breadcrumbs: [
             {
-                title: 'Profile settings',
+                title:
+                    props.locale === 'es'
+                        ? 'Configuración del perfil'
+                        : 'Profile settings',
                 href: edit(),
             },
         ],
-    },
+    }),
 });
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 </script>
 
 <template>
-    <Head title="Profile settings" />
+    <Head :title="tr('Configuración del perfil', 'Profile settings')" />
 
-    <h1 class="sr-only">Profile settings</h1>
+    <h1 class="sr-only">
+        {{ tr('Configuración del perfil', 'Profile settings') }}
+    </h1>
 
     <div class="flex flex-col space-y-6">
         <Heading
             variant="small"
-            title="Profile"
-            description="Update your name and email address"
+            :title="tr('Perfil', 'Profile')"
+            :description="
+                tr(
+                    'Actualiza tu nombre y correo electrónico',
+                    'Update your name and email address',
+                )
+            "
         />
 
         <Form
@@ -45,7 +57,7 @@ const user = computed(() => page.props.auth.user);
             v-slot="{ errors, processing }"
         >
             <div class="grid gap-2">
-                <Label for="name">Name</Label>
+                <Label for="name">{{ tr('Nombre', 'Name') }}</Label>
                 <Input
                     id="name"
                     class="mt-1 block w-full"
@@ -53,13 +65,15 @@ const user = computed(() => page.props.auth.user);
                     :default-value="user.name"
                     required
                     autocomplete="name"
-                    placeholder="Full name"
+                    :placeholder="tr('Nombre completo', 'Full name')"
                 />
                 <InputError class="mt-2" :message="errors.name" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">{{
+                    tr('Correo electrónico', 'Email address')
+                }}</Label>
                 <Input
                     id="email"
                     type="email"
@@ -68,20 +82,30 @@ const user = computed(() => page.props.auth.user);
                     :default-value="user.email"
                     required
                     autocomplete="username"
-                    placeholder="Email address"
+                    :placeholder="tr('Correo electrónico', 'Email address')"
                 />
                 <InputError class="mt-2" :message="errors.email" />
             </div>
 
             <div v-if="page.props.mustVerifyEmail && !user.email_verified_at">
                 <p class="-mt-4 text-sm text-muted-foreground">
-                    Your email address is unverified.
+                    {{
+                        tr(
+                            'Tu correo electrónico no está verificado.',
+                            'Your email address is unverified.',
+                        )
+                    }}
                     <Link
                         :href="send()"
                         as="button"
                         class="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                     >
-                        Click here to re-send the verification email.
+                        {{
+                            tr(
+                                'Haz clic aquí para reenviar el correo de verificación.',
+                                'Click here to re-send the verification email.',
+                            )
+                        }}
                     </Link>
                 </p>
 
@@ -89,13 +113,20 @@ const user = computed(() => page.props.auth.user);
                     v-if="page.props.status === 'verification-link-sent'"
                     class="mt-2 text-sm font-medium text-green-600"
                 >
-                    A new verification link has been sent to your email address.
+                    {{
+                        tr(
+                            'Se ha enviado un nuevo enlace de verificación a tu correo electrónico.',
+                            'A new verification link has been sent to your email address.',
+                        )
+                    }}
                 </div>
             </div>
 
             <div class="flex items-center gap-4">
-                <Button :disabled="processing" data-test="update-profile-button"
-                    >Save</Button
+                <Button
+                    :disabled="processing"
+                    data-test="update-profile-button"
+                    >{{ tr('Guardar', 'Save') }}</Button
                 >
             </div>
         </Form>

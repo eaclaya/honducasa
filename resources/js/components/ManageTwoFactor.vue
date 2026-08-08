@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form } from '@inertiajs/vue3';
+import { Form, usePage } from '@inertiajs/vue3';
 import { ShieldCheck } from '@lucide/vue';
 import { onUnmounted, ref } from 'vue';
 import Heading from '@/components/Heading.vue';
@@ -24,6 +24,10 @@ withDefaults(defineProps<Props>(), {
 const { hasSetupData, clearTwoFactorAuthData } = useTwoFactorAuth();
 const showSetupModal = ref<boolean>(false);
 
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
+
 onUnmounted(() => clearTwoFactorAuthData());
 </script>
 
@@ -31,8 +35,15 @@ onUnmounted(() => clearTwoFactorAuthData());
     <div v-if="canManageTwoFactor" class="space-y-6">
         <Heading
             variant="small"
-            title="Two-factor authentication"
-            description="Manage your two-factor authentication settings"
+            :title="
+                tr('Autenticación de dos factores', 'Two-factor authentication')
+            "
+            :description="
+                tr(
+                    'Administra la configuración de tu autenticación de dos factores',
+                    'Manage your two-factor authentication settings',
+                )
+            "
         />
 
         <div
@@ -40,14 +51,19 @@ onUnmounted(() => clearTwoFactorAuthData());
             class="flex flex-col items-start justify-start space-y-4"
         >
             <p class="text-sm text-muted-foreground">
-                When you enable two-factor authentication, you will be prompted
-                for a secure pin during login. This pin can be retrieved from a
-                TOTP-supported application on your phone.
+                {{
+                    tr(
+                        'Cuando actives la autenticación de dos factores, se te pedirá un pin seguro al iniciar sesión. Este pin se obtiene de una aplicación TOTP en tu teléfono.',
+                        'When you enable two-factor authentication, you will be prompted for a secure pin during login. This pin can be retrieved from a TOTP-supported application on your phone.',
+                    )
+                }}
             </p>
 
             <div>
                 <Button v-if="hasSetupData" @click="showSetupModal = true">
-                    <ShieldCheck />Continue setup
+                    <ShieldCheck />{{
+                        tr('Continuar configuración', 'Continue setup')
+                    }}
                 </Button>
                 <Form
                     v-else
@@ -56,7 +72,7 @@ onUnmounted(() => clearTwoFactorAuthData());
                     #default="{ processing }"
                 >
                     <Button type="submit" :disabled="processing">
-                        Enable 2FA
+                        {{ tr('Activar 2FA', 'Enable 2FA') }}
                     </Button>
                 </Form>
             </div>
@@ -64,9 +80,12 @@ onUnmounted(() => clearTwoFactorAuthData());
 
         <div v-else class="flex flex-col items-start justify-start space-y-4">
             <p class="text-sm text-muted-foreground">
-                You will be prompted for a secure, random pin during login,
-                which you can retrieve from the TOTP-supported application on
-                your phone.
+                {{
+                    tr(
+                        'Se te pedirá un pin seguro y aleatorio al iniciar sesión, el cual puedes obtener de la aplicación TOTP en tu teléfono.',
+                        'You will be prompted for a secure, random pin during login, which you can retrieve from the TOTP-supported application on your phone.',
+                    )
+                }}
             </p>
 
             <div class="relative inline">
@@ -76,7 +95,7 @@ onUnmounted(() => clearTwoFactorAuthData());
                         type="submit"
                         :disabled="processing"
                     >
-                        Disable 2FA
+                        {{ tr('Desactivar 2FA', 'Disable 2FA') }}
                     </Button>
                 </Form>
             </div>

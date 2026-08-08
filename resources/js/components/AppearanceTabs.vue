@@ -1,14 +1,23 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
 import { Monitor, Moon, Sun } from '@lucide/vue';
+import { computed } from 'vue';
 import { useAppearance } from '@/composables/useAppearance';
 
 const { appearance, updateAppearance } = useAppearance();
 
-const tabs = [
-    { value: 'light', Icon: Sun, label: 'Light' },
-    { value: 'dark', Icon: Moon, label: 'Dark' },
-    { value: 'system', Icon: Monitor, label: 'System' },
-] as const;
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
+
+const tabs = computed(
+    () =>
+        [
+            { value: 'light', Icon: Sun, label: tr('Claro', 'Light') },
+            { value: 'dark', Icon: Moon, label: tr('Oscuro', 'Dark') },
+            { value: 'system', Icon: Monitor, label: tr('Sistema', 'System') },
+        ] as const,
+);
 </script>
 
 <template>

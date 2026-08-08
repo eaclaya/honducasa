@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { KeyRound } from '@lucide/vue';
 import { destroy } from '@/actions/Laravel/Passkeys/Http/Controllers/PasskeyRegistrationController';
 import Heading from '@/components/Heading.vue';
@@ -27,14 +27,23 @@ const handleDelete = (id: number, onError: () => void) => {
 const handleRegisterSuccess = () => {
     router.reload();
 };
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 </script>
 
 <template>
     <div v-if="canManagePasskeys" class="space-y-6">
         <Heading
             variant="small"
-            title="Passkeys"
-            description="Manage your passkeys for passwordless sign-in"
+            :title="tr('Llaves de acceso', 'Passkeys')"
+            :description="
+                tr(
+                    'Administra tus llaves de acceso para iniciar sesión sin contraseña',
+                    'Manage your passkeys for passwordless sign-in',
+                )
+            "
         />
 
         <div class="overflow-hidden rounded-lg border border-border">
@@ -53,9 +62,18 @@ const handleRegisterSuccess = () => {
                 >
                     <KeyRound class="h-7 w-7 text-muted-foreground" />
                 </div>
-                <p class="font-medium">No passkeys yet</p>
+                <p class="font-medium">
+                    {{
+                        tr('Aún no tienes llaves de acceso', 'No passkeys yet')
+                    }}
+                </p>
                 <p class="mt-1 text-sm text-muted-foreground">
-                    Add a passkey to sign in without a password
+                    {{
+                        tr(
+                            'Agrega una llave de acceso para iniciar sesión sin contraseña',
+                            'Add a passkey to sign in without a password',
+                        )
+                    }}
                 </p>
             </div>
         </div>

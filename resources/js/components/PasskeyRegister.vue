@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
 import { usePasskeyRegister } from '@laravel/passkeys/vue';
 import { ref } from 'vue';
 import InputError from '@/components/InputError.vue';
@@ -35,6 +36,10 @@ const getDefaultPasskeyName = () => {
 const name = ref(getDefaultPasskeyName());
 const showForm = ref(false);
 
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
+
 const { register, isLoading, error, isSupported } = usePasskeyRegister({
     onSuccess: () => {
         name.value = '';
@@ -61,11 +66,16 @@ const handleCancel = () => {
 
 <template>
     <div v-if="!isSupported" class="text-sm text-muted-foreground">
-        Passkeys are not supported in this browser.
+        {{
+            tr(
+                'Este navegador no es compatible con llaves de acceso.',
+                'Passkeys are not supported in this browser.',
+            )
+        }}
     </div>
 
     <Button v-else-if="!showForm" variant="outline" @click="showForm = true">
-        Add passkey
+        {{ tr('Agregar llave de acceso', 'Add passkey') }}
     </Button>
 
     <form
@@ -74,17 +84,26 @@ const handleCancel = () => {
         class="space-y-4 rounded-lg border border-border bg-muted/50 p-4"
     >
         <div class="grid gap-2">
-            <Label for="passkey-name">Passkey name</Label>
+            <Label for="passkey-name">{{
+                tr('Nombre de la llave de acceso', 'Passkey name')
+            }}</Label>
             <Input
                 id="passkey-name"
                 type="text"
                 v-model="name"
-                placeholder="e.g., MacBook Pro, iPhone"
+                :placeholder="
+                    tr('ej., MacBook Pro, iPhone', 'e.g., MacBook Pro, iPhone')
+                "
                 class="mt-1 block w-full border-foreground/20"
                 autofocus
             />
             <p class="text-xs text-muted-foreground">
-                A name helps you identify this passkey later.
+                {{
+                    tr(
+                        'Un nombre te ayuda a identificar esta llave de acceso más adelante.',
+                        'A name helps you identify this passkey later.',
+                    )
+                }}
             </p>
         </div>
 
@@ -92,10 +111,14 @@ const handleCancel = () => {
 
         <div class="flex gap-2">
             <Button type="submit" :disabled="isLoading || !name.trim()">
-                {{ isLoading ? 'Registering...' : 'Register passkey' }}
+                {{
+                    isLoading
+                        ? tr('Registrando...', 'Registering...')
+                        : tr('Registrar llave de acceso', 'Register passkey')
+                }}
             </Button>
             <Button type="button" variant="ghost" @click="handleCancel">
-                Cancel
+                {{ tr('Cancelar', 'Cancel') }}
             </Button>
         </div>
     </form>

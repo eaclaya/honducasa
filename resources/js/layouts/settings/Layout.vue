@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -11,24 +12,28 @@ import { edit as editSecurity } from '@/routes/security';
 import { index as teams } from '@/routes/teams';
 import type { NavItem } from '@/types';
 
-const sidebarNavItems: NavItem[] = [
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
+
+const sidebarNavItems = computed<NavItem[]>(() => [
     {
-        title: 'Profile',
+        title: tr('Perfil', 'Profile'),
         href: editProfile(),
     },
     {
-        title: 'Security',
+        title: tr('Seguridad', 'Security'),
         href: editSecurity(),
     },
     {
-        title: 'Teams',
+        title: tr('Equipos', 'Teams'),
         href: teams(),
     },
     {
-        title: 'Appearance',
+        title: tr('Apariencia', 'Appearance'),
         href: editAppearance(),
     },
-];
+]);
 
 const { isCurrentOrParentUrl } = useCurrentUrl();
 </script>
@@ -36,8 +41,13 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
 <template>
     <div class="px-4 py-6">
         <Heading
-            title="Settings"
-            description="Manage your profile and account settings"
+            :title="tr('Configuración', 'Settings')"
+            :description="
+                tr(
+                    'Administra tu perfil y la configuración de tu cuenta',
+                    'Manage your profile and account settings',
+                )
+            "
         />
 
         <div class="flex flex-col lg:flex-row lg:space-x-12">

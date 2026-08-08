@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form } from '@inertiajs/vue3';
+import { Form, usePage } from '@inertiajs/vue3';
 import { Check, Copy, ScanLine } from '@lucide/vue';
 import { useClipboard } from '@vueuse/core';
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
@@ -41,31 +41,51 @@ const { qrCodeSvg, manualSetupKey, clearSetupData, fetchSetupData, errors } =
 const showVerificationStep = ref(false);
 const code = ref<string>('');
 
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
+
 const pinInputContainerRef = useTemplateRef('pinInputContainerRef');
 
 const modalConfig = computed<TwoFactorConfigContent>(() => {
     if (props.twoFactorEnabled) {
         return {
-            title: 'Two-factor authentication enabled',
-            description:
+            title: tr(
+                'Autenticación de dos factores activada',
+                'Two-factor authentication enabled',
+            ),
+            description: tr(
+                'La autenticación de dos factores está activada. Escanea el código QR o ingresa la clave de configuración en tu aplicación de autenticación.',
                 'Two-factor authentication is now enabled. Scan the QR code or enter the setup key in your authenticator app.',
-            buttonText: 'Close',
+            ),
+            buttonText: tr('Cerrar', 'Close'),
         };
     }
 
     if (showVerificationStep.value) {
         return {
-            title: 'Verify authentication code',
-            description: 'Enter the 6-digit code from your authenticator app',
-            buttonText: 'Continue',
+            title: tr(
+                'Verificar código de autenticación',
+                'Verify authentication code',
+            ),
+            description: tr(
+                'Ingresa el código de 6 dígitos de tu aplicación de autenticación',
+                'Enter the 6-digit code from your authenticator app',
+            ),
+            buttonText: tr('Continuar', 'Continue'),
         };
     }
 
     return {
-        title: 'Enable two-factor authentication',
-        description:
+        title: tr(
+            'Activar autenticación de dos factores',
+            'Enable two-factor authentication',
+        ),
+        description: tr(
+            'Para terminar de activar la autenticación de dos factores, escanea el código QR o ingresa la clave de configuración en tu aplicación de autenticación',
             'To finish enabling two-factor authentication, scan the QR code or enter the setup key in your authenticator app',
-        buttonText: 'Continue',
+        ),
+        buttonText: tr('Continuar', 'Continue'),
     };
 });
 
@@ -196,9 +216,12 @@ watch(
                             <div
                                 class="absolute inset-0 top-1/2 h-px w-full bg-border"
                             />
-                            <span class="relative bg-card px-2 py-1"
-                                >or, enter the code manually</span
-                            >
+                            <span class="relative bg-card px-2 py-1">{{
+                                tr(
+                                    'o ingresa el código manualmente',
+                                    'or, enter the code manually',
+                                )
+                            }}</span>
                         </div>
 
                         <div
@@ -279,14 +302,14 @@ watch(
                                     @click="showVerificationStep = false"
                                     :disabled="processing"
                                 >
-                                    Back
+                                    {{ tr('Atrás', 'Back') }}
                                 </Button>
                                 <Button
                                     type="submit"
                                     class="w-auto flex-1"
                                     :disabled="processing || code.length < 6"
                                 >
-                                    Confirm
+                                    {{ tr('Confirmar', 'Confirm') }}
                                 </Button>
                             </div>
                         </div>

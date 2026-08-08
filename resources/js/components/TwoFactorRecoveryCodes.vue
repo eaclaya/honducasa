@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form } from '@inertiajs/vue3';
+import { Form, usePage } from '@inertiajs/vue3';
 import { Eye, EyeOff, LockKeyhole, RefreshCw } from '@lucide/vue';
 import { nextTick, onMounted, ref, useTemplateRef } from 'vue';
 import AlertError from '@/components/AlertError.vue';
@@ -13,6 +13,10 @@ import {
 } from '@/components/ui/card';
 import { useTwoFactorAuth } from '@/composables/useTwoFactorAuth';
 import { regenerateRecoveryCodes } from '@/routes/two-factor';
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 
 const { recoveryCodesList, fetchRecoveryCodes, errors } = useTwoFactorAuth();
 const isRecoveryCodesVisible = ref<boolean>(false);
@@ -42,11 +46,17 @@ onMounted(async () => {
     <Card class="w-full">
         <CardHeader>
             <CardTitle class="flex gap-3">
-                <LockKeyhole class="size-4" />2FA recovery codes
+                <LockKeyhole class="size-4" />{{
+                    tr('Códigos de recuperación 2FA', '2FA recovery codes')
+                }}
             </CardTitle>
             <CardDescription>
-                Recovery codes let you regain access if you lose your 2FA
-                device. Store them in a secure password manager.
+                {{
+                    tr(
+                        'Los códigos de recuperación te permiten recuperar el acceso si pierdes tu dispositivo 2FA. Guárdalos en un gestor de contraseñas seguro.',
+                        'Recovery codes let you regain access if you lose your 2FA device. Store them in a secure password manager.',
+                    )
+                }}
             </CardDescription>
         </CardHeader>
         <CardContent>
@@ -58,8 +68,17 @@ onMounted(async () => {
                         :is="isRecoveryCodesVisible ? EyeOff : Eye"
                         class="size-4"
                     />
-                    {{ isRecoveryCodesVisible ? 'Hide' : 'View' }} recovery
-                    codes
+                    {{
+                        isRecoveryCodesVisible
+                            ? tr(
+                                  'Ocultar códigos de recuperación',
+                                  'Hide recovery codes',
+                              )
+                            : tr(
+                                  'Ver códigos de recuperación',
+                                  'View recovery codes',
+                              )
+                    }}
                 </Button>
 
                 <Form
@@ -75,7 +94,8 @@ onMounted(async () => {
                         type="submit"
                         :disabled="processing"
                     >
-                        <RefreshCw /> Regenerate codes
+                        <RefreshCw />
+                        {{ tr('Regenerar códigos', 'Regenerate codes') }}
                     </Button>
                 </Form>
             </div>
@@ -111,10 +131,16 @@ onMounted(async () => {
                         </div>
                     </div>
                     <p class="text-xs text-muted-foreground select-none">
-                        Each recovery code can be used once to access your
-                        account and will be removed after use. If you need more,
-                        click
-                        <span class="font-bold">Regenerate codes</span> above.
+                        {{
+                            tr(
+                                'Cada código de recuperación puede usarse una sola vez para acceder a tu cuenta y se eliminará después de usarlo. Si necesitas más, haz clic en',
+                                'Each recovery code can be used once to access your account and will be removed after use. If you need more, click',
+                            )
+                        }}
+                        <span class="font-bold">{{
+                            tr('Regenerar códigos', 'Regenerate codes')
+                        }}</span>
+                        {{ tr('arriba.', 'above.') }}
                     </p>
                 </div>
             </div>

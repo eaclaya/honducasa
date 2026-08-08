@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePage } from '@inertiajs/vue3';
 import { KeyRound, Trash2 } from '@lucide/vue';
 import { ref } from 'vue';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,10 @@ const emit = defineEmits<{
 }>();
 
 const isDeleting = ref(false);
+
+const page = usePage();
+const tr = (es: string, en: string): string =>
+    page.props.locale === 'es' ? es : en;
 
 const handleDelete = () => {
     isDeleting.value = true;
@@ -50,10 +55,11 @@ const handleDelete = () => {
                     </span>
                 </div>
                 <p class="text-sm text-muted-foreground">
-                    Added {{ passkey.created_at_diff }}
+                    {{ tr('Agregada', 'Added') }} {{ passkey.created_at_diff }}
                     <template v-if="passkey.last_used_at_diff">
                         <span class="mx-1 text-muted-foreground/50">/</span>
-                        Last used {{ passkey.last_used_at_diff }}
+                        {{ tr('Último uso', 'Last used') }}
+                        {{ passkey.last_used_at_diff }}
                     </template>
                 </p>
             </div>
@@ -67,26 +73,41 @@ const handleDelete = () => {
                     class="text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
                     <Trash2 class="h-4 w-4" />
-                    <span class="sr-only">Remove</span>
+                    <span class="sr-only">{{ tr('Eliminar', 'Remove') }}</span>
                 </Button>
             </DialogTrigger>
 
             <DialogContent>
-                <DialogTitle>Remove passkey</DialogTitle>
+                <DialogTitle>{{
+                    tr('Eliminar llave de acceso', 'Remove passkey')
+                }}</DialogTitle>
                 <DialogDescription>
-                    Are you sure you want to remove the "{{ passkey.name }}"
-                    passkey? You will no longer be able to use it to sign in.
+                    {{
+                        tr(
+                            `¿Estás seguro de que quieres eliminar la llave de acceso "${passkey.name}"? Ya no podrás usarla para iniciar sesión.`,
+                            `Are you sure you want to remove the "${passkey.name}" passkey? You will no longer be able to use it to sign in.`,
+                        )
+                    }}
                 </DialogDescription>
                 <DialogFooter class="gap-2">
                     <DialogClose as-child>
-                        <Button variant="secondary">Cancel</Button>
+                        <Button variant="secondary">{{
+                            tr('Cancelar', 'Cancel')
+                        }}</Button>
                     </DialogClose>
                     <Button
                         variant="destructive"
                         :disabled="isDeleting"
                         @click="handleDelete"
                     >
-                        {{ isDeleting ? 'Removing...' : 'Remove passkey' }}
+                        {{
+                            isDeleting
+                                ? tr('Eliminando...', 'Removing...')
+                                : tr(
+                                      'Eliminar llave de acceso',
+                                      'Remove passkey',
+                                  )
+                        }}
                     </Button>
                 </DialogFooter>
             </DialogContent>
