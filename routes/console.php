@@ -9,3 +9,8 @@ Schedule::call(function () {
         ->where('expires_at', '<', now())
         ->delete();
 })->daily()->description('Delete expired team invitations');
+
+Schedule::command('app:send-saved-search-alerts')
+    ->hourly()
+    ->withoutOverlapping()
+    ->description('Notify users about new saved-search matches');

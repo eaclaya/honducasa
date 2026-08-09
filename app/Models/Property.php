@@ -3,7 +3,10 @@
 namespace App\Models;
 
 use App\Data\GeoPoint;
+use App\Enums\ApproximateLocationShape;
 use App\Enums\Furnishing;
+use App\Enums\ListingStatus;
+use App\Enums\ListingType;
 use App\Enums\LocationPrecision;
 use App\Enums\PropertyType;
 use Database\Factories\PropertyFactory;
@@ -11,12 +14,17 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use InvalidArgumentException;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 /**
  * @property int $id
@@ -24,12 +32,18 @@ use InvalidArgumentException;
  * @property int $location_id
  * @property int $created_by
  * @property PropertyType $type
+ * @property ListingType $listing_type
+ * @property ListingStatus $status
+ * @property Carbon|null $published_at
  * @property string|null $name
  * @property string $slug
  * @property string|null $address_line
  * @property string|null $address_landmark
  * @property string $coordinates
  * @property LocationPrecision $public_location_precision
+ * @property ApproximateLocationShape|null $approximate_shape
+ * @property int|null $approximate_radius_meters
+ * @property array<string, mixed>|null $approximate_polygon
  * @property int $bedrooms
  * @property string $bathrooms
  * @property int $parking_spaces
@@ -37,24 +51,35 @@ use InvalidArgumentException;
  * @property int|null $lot_area_m2
  * @property int|null $year_built
  * @property Furnishing $furnishing
- * @property string $description
+ * @property int $price_amount
+ * @property string $currency
+ * @property int|null $deposit_amount
+ * @property bool $utilities_included
+ * @property string|null $description
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  * @property-read Team $team
  * @property-read Location $location
  * @property-read User $creator
+ * @property-read Collection<int, Conversation> $conversations
  */
 #[Fillable([
     'team_id',
     'location_id',
     'created_by',
     'type',
+    'listing_type',
+    'status',
+    'published_at',
     'name',
     'slug',
     'address_line',
     'address_landmark',
     'public_location_precision',
+    'approximate_shape',
+    'approximate_radius_meters',
+    'approximate_polygon',
     'bedrooms',
     'bathrooms',
     'parking_spaces',
@@ -62,13 +87,17 @@ use InvalidArgumentException;
     'lot_area_m2',
     'year_built',
     'furnishing',
+    'price_amount',
+    'currency',
+    'deposit_amount',
+    'utilities_included',
     'description',
 ])]
 #[Hidden(['address_line', 'coordinates'])]
-class Property extends Model
+class Property extends Model implements HasMedia
 {
     /** @use HasFactory<PropertyFactory> */
-    use HasFactory, SoftDeletes;
+    use HasFactory, InteractsWithMedia, SoftDeletes;
 
     private const string DISTANCE_SELECT = 'ST_Distance(coordinates, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography) AS distance_meters';
 
@@ -102,6 +131,30 @@ class Property extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('photos');
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+            ->width(480)
+            ->height(360)
+            ->sharpen(10)
+            ->nonQueued();
+    }
+
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
+    }
+
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(PropertyFavorite::class);
     }
 
     /**
@@ -141,7 +194,13 @@ class Property extends Model
     {
         return [
             'type' => PropertyType::class,
+            'listing_type' => ListingType::class,
+            'status' => ListingStatus::class,
+            'published_at' => 'datetime',
             'public_location_precision' => LocationPrecision::class,
+            'approximate_shape' => ApproximateLocationShape::class,
+            'approximate_radius_meters' => 'integer',
+            'approximate_polygon' => 'array',
             'bedrooms' => 'integer',
             'bathrooms' => 'decimal:1',
             'parking_spaces' => 'integer',
@@ -149,6 +208,9 @@ class Property extends Model
             'lot_area_m2' => 'integer',
             'year_built' => 'integer',
             'furnishing' => Furnishing::class,
+            'price_amount' => 'integer',
+            'deposit_amount' => 'integer',
+            'utilities_included' => 'boolean',
         ];
     }
 }

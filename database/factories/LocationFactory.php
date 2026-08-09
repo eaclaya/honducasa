@@ -32,6 +32,20 @@ class LocationFactory extends Factory
     }
 
     /**
+     * A Honduran city we know the center of, so listings pinned near it can be
+     * filed under it (see `App\Support\NearestCity`).
+     */
+    public function hondurasCity(string $name = 'Tegucigalpa'): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'country_code' => 'HN',
+            'type' => LocationType::City,
+            'name' => $name,
+            'slug' => Str::slug($name),
+        ]);
+    }
+
+    /**
      * Indicate that the location is inactive.
      */
     public function inactive(): static

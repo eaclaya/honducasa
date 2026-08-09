@@ -39,5 +39,29 @@ services:
       retries: 15
       start_period: 5s
 
+  # Self-hosted location search (see PropertyLocationPicker.vue and
+  # PlaceSearchController) — Mapbox's own geocoding data for Honduras is too thin
+  # for real places (colonias, hospitals, landmarks), so search is proxied through
+  # this instead. Reachable over plain HTTP via NOMINATIM_URL, so the Laravel app
+  # never needs to run in the same container/host as this — works the same
+  # locally (via Herd) and later on whatever production host is chosen.
+  #
+  # First start imports the Honduras OSM extract (~70MB) and takes ~15-30 minutes;
+  # watch `docker compose logs -f nominatim` until it reports readiness.
+  nominatim:
+    image: mediagis/nominatim:5.3.2
+    restart: unless-stopped
+    shm_size: 1gb
+    ports:
+      - '127.0.0.1:8089:8080'
+    environment:
+      PBF_URL: https://download.geofabrik.de/central-america/honduras-latest.osm.pbf
+      REPLICATION_URL: https://download.geofabrik.de/central-america/honduras-updates/
+      IMPORT_WIKIPEDIA: 'false'
+      NOMINATIM_PASSWORD: nominatim
+    volumes:
+      - nominatim-data:/var/lib/postgresql/16/main
+
 volumes:
   database-data:
+  nominatim-data:

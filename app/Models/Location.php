@@ -5,12 +5,15 @@ namespace App\Models;
 use App\Enums\LocationType;
 use Database\Factories\LocationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * @property int $id
@@ -31,6 +34,34 @@ class Location extends Model
 {
     /** @use HasFactory<LocationFactory> */
     use HasFactory;
+
+    /**
+     * Match a location name without requiring users to enter accents.
+     */
+    #[Scope]
+    protected function matchingSearch(Builder $query, string $search): Builder
+    {
+        return $query->where(function (Builder $query) use ($search): void {
+            $query
+                ->where('name', 'ilike', '%'.$search.'%')
+                ->orWhere('slug', 'like', '%'.Str::slug($search).'%');
+        });
+    }
+
+    /**
+     * Match this location or any of its administrative ancestors.
+     */
+    #[Scope]
+    protected function matchingHierarchy(Builder $query, string $search): Builder
+    {
+        return $query->where(function (Builder $query) use ($search): void {
+            $query
+                ->matchingSearch($search)
+                ->orWhereHas('parent', fn (Builder $parent) => $parent->matchingSearch($search))
+                ->orWhereHas('parent.parent', fn (Builder $parent) => $parent->matchingSearch($search))
+                ->orWhereHas('parent.parent.parent', fn (Builder $parent) => $parent->matchingSearch($search));
+        });
+    }
 
     /**
      * Get the parent administrative location.

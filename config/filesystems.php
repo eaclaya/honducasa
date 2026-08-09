@@ -47,6 +47,16 @@ return [
             'report' => false,
         ],
 
+        // Never actually written to: media rows on this disk are served by
+        // ExternalUrlGenerator from their `external_url` custom property
+        // instead (used by the demo property seeder's stock photos).
+        'external' => [
+            'driver' => 'local',
+            'root' => storage_path('app/external'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

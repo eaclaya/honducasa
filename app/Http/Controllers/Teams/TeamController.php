@@ -40,10 +40,6 @@ class TeamController extends Controller
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Team created.')]);
 
-        if ($request->boolean('publish')) {
-            return to_route('listings.create', ['current_team' => $team->slug]);
-        }
-
         return to_route('teams.edit', ['team' => $team->slug]);
     }
 

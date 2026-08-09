@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Membership> $memberships
  * @property-read Collection<int, User> $members
  * @property-read Collection<int, Property> $properties
+ * @property-read Collection<int, Conversation> $conversations
  */
 #[Fillable(['name', 'slug', 'is_personal'])]
 class Team extends Model
@@ -104,6 +105,11 @@ class Team extends Model
     public function properties(): HasMany
     {
         return $this->hasMany(Property::class);
+    }
+
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
     }
 
     /**

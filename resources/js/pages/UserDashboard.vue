@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { Building2, Heart, MessageCircle, Search } from '@lucide/vue';
-import CreateTeamModal from '@/components/CreateTeamModal.vue';
 import PendingInvitationsModal from '@/components/PendingInvitationsModal.vue';
 import { Button } from '@/components/ui/button';
 import { index as favorites } from '@/routes/favorites';
+import { start as startListing } from '@/routes/listings';
 import { show as messages } from '@/routes/messages';
 import { index as rentals } from '@/routes/rentals';
 import { index as savedSearches } from '@/routes/saved-searches';
@@ -163,8 +163,8 @@ defineOptions({
                 <p class="mt-1 text-sm text-muted-foreground">
                     {{
                         tr(
-                            'Crea tu equipo para comenzar a publicar y recibir mensajes de interesados.',
-                            'Create your team to start publishing and receiving messages from interested renters.',
+                            'Publica tu propiedad y empieza a recibir mensajes de interesados.',
+                            'Publish your property and start receiving messages from interested renters.',
                         )
                     }}
                 </p>
@@ -175,11 +175,11 @@ defineOptions({
                         tr('Explorar propiedades', 'Explore properties')
                     }}</Link>
                 </Button>
-                <CreateTeamModal publish>
-                    <Button data-test="become-landlord-button">
-                        {{ tr('Publicar propiedad', 'List a property') }}
-                    </Button>
-                </CreateTeamModal>
+                <Button data-test="become-landlord-button" as-child>
+                    <Link :href="startListing().url">{{
+                        tr('Publicar propiedad', 'List a property')
+                    }}</Link>
+                </Button>
             </div>
         </section>
     </main>

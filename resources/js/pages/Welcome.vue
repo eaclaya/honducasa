@@ -13,9 +13,11 @@ import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import LocationTypeahead from '@/components/LocationTypeahead.vue';
 import PublicHeader from '@/components/PublicHeader.vue';
 import { register } from '@/routes';
-import { create as createListing } from '@/routes/listings';
+import {
+    create as createListing,
+    start as startListing,
+} from '@/routes/listings';
 import { index as rentals } from '@/routes/rentals';
-import { dashboard as userDashboard } from '@/routes/user';
 
 const page = usePage();
 const locale = computed(() => page.props.locale);
@@ -32,7 +34,7 @@ const listPropertyUrl = computed(() => {
         return createListing.url(page.props.currentTeam.slug);
     }
 
-    return page.props.auth.user ? userDashboard().url : register.url();
+    return page.props.auth.user ? startListing().url : register.url();
 });
 
 const searchRentals = (): void => {

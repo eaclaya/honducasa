@@ -8,10 +8,12 @@ use App\Http\Controllers\ConversationReportController;
 use App\Http\Controllers\ConversationStatusController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ListingController;
+use App\Http\Controllers\ListingUploadController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\LocationSearchController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PlaceSearchController;
 use App\Http\Controllers\PropertyFavoriteController;
 use App\Http\Controllers\PropertyShowController;
 use App\Http\Controllers\RentalSearchController;
@@ -26,6 +28,9 @@ Route::get('/rentals', RentalSearchController::class)->name('rentals.index');
 Route::get('/locations/search', LocationSearchController::class)
     ->middleware('throttle:60,1')
     ->name('locations.search');
+Route::get('/places/search', PlaceSearchController::class)
+    ->middleware('throttle:60,1')
+    ->name('places.search');
 Route::get('/properties/{property:slug}', PropertyShowController::class)->name('properties.show');
 Route::post('/locale/{locale}', LocaleController::class)->whereIn('locale', ['es', 'en'])->name('locale.update');
 
@@ -37,6 +42,13 @@ Route::middleware(['guest', 'throttle:20,1'])->group(function () {
 Route::get('dashboard', UserDashboardController::class)
     ->middleware(['auth', 'verified'])
     ->name('user.dashboard');
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('listings/start', [ListingController::class, 'create'])->name('listings.start');
+    Route::post('listings/start', [ListingController::class, 'store'])->name('listings.start.store');
+    Route::post('listings/uploads', [ListingUploadController::class, 'store'])->name('listings.uploads.store');
+    Route::delete('listings/uploads/{media}', [ListingUploadController::class, 'destroy'])->name('listings.uploads.destroy');
+});
 
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])

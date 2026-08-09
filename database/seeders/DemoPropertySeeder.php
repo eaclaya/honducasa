@@ -76,6 +76,12 @@ class DemoPropertySeeder extends Seeder
         $markets = $this->marketsWithLocationIds();
 
         DB::transaction(function () use ($markets, $owner, $teamId): void {
+            // Bulk forceDelete() issues a raw SQL DELETE and never fires model
+            // events, so Spatie's automatic media cleanup (which only runs on
+            // an individually-deleted model) never triggers — media rows for
+            // re-seeded demo properties must be cleared explicitly first.
+            $staleDemoPropertyIds = Property::query()->where('slug', 'like', 'demo-%')->pluck('id');
+            DB::table('media')->where('model_type', Property::class)->whereIn('model_id', $staleDemoPropertyIds)->delete();
             Property::query()->where('slug', 'like', 'demo-%')->forceDelete();
 
             for ($offset = 0; $offset < self::PROPERTY_COUNT; $offset += self::INSERT_CHUNK_SIZE) {
@@ -254,6 +260,13 @@ class DemoPropertySeeder extends Seeder
         ];
     }
 
+    /**
+     * Demo properties point at stock photo URLs we don't own, so they're
+     * inserted directly as `media` rows on the `external` disk rather than
+     * downloaded and processed through Spatie's normal `addMedia()` pipeline
+     * — `ExternalUrlGenerator` serves their URL straight from
+     * `custom_properties.external_url`.
+     */
     private function seedPrimaryImages(): void
     {
         Property::query()
@@ -264,19 +277,33 @@ class DemoPropertySeeder extends Seeder
                 $timestamp = now();
                 $rows = $properties->flatMap(function (Property $property) use ($timestamp): array {
                     $startIndex = abs(crc32($property->slug)) % count(self::IMAGE_URLS);
+                    $altText = ($property->name ?? 'Rental property').' in '.$property->location->name;
 
                     return array_map(fn (int $sortOrder) => [
-                        'property_id' => $property->id,
-                        'url' => self::IMAGE_URLS[($startIndex + $sortOrder) % count(self::IMAGE_URLS)],
-                        'alt_text' => ($property->name ?? 'Rental property').' in '.$property->location->name,
-                        'sort_order' => $sortOrder,
-                        'is_primary' => $sortOrder === 0,
+                        'model_type' => Property::class,
+                        'model_id' => $property->id,
+                        'uuid' => Str::uuid()->toString(),
+                        'collection_name' => 'photos',
+                        'name' => $altText,
+                        'file_name' => 'photo-'.$sortOrder.'.jpg',
+                        'mime_type' => 'image/jpeg',
+                        'disk' => 'external',
+                        'conversions_disk' => 'external',
+                        'size' => 0,
+                        'manipulations' => '[]',
+                        'custom_properties' => json_encode([
+                            'external_url' => self::IMAGE_URLS[($startIndex + $sortOrder) % count(self::IMAGE_URLS)],
+                            'alt_text' => $altText,
+                        ], JSON_THROW_ON_ERROR),
+                        'generated_conversions' => '[]',
+                        'responsive_images' => '[]',
+                        'order_column' => $sortOrder + 1,
                         'created_at' => $timestamp,
                         'updated_at' => $timestamp,
                     ], range(0, 2));
                 })->all();
 
-                DB::table('property_images')->insert($rows);
+                DB::table('media')->insert($rows);
             });
     }
 }

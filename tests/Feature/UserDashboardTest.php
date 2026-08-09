@@ -100,18 +100,22 @@ test('declining an invitation returns a team-less user to the user dashboard', f
     expect($user->fresh()->teams()->count())->toBe(0);
 });
 
-test('creating a team with publish intent forwards to listing creation', function () {
+test('visiting the listing wizard as a team-less user creates no team', function () {
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)->post(route('teams.store'), [
-        'name' => 'My Rentals',
-        'publish' => '1',
-    ]);
+    $this->actingAs($user)
+        ->get(route('listings.start'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('listings/Form'));
 
-    $team = $user->fresh()->currentTeam;
+    expect($user->fresh()->teams()->count())->toBe(0)
+        ->and($user->fresh()->current_team_id)->toBeNull();
+});
 
-    expect($team)->not->toBeNull()
-        ->and($team->name)->toBe('My Rentals');
+test('visiting the listing wizard as an existing landlord redirects to their team', function () {
+    $user = User::factory()->withPersonalTeam()->create();
 
-    $response->assertRedirect(route('listings.create', ['current_team' => $team->slug]));
+    $this->actingAs($user)
+        ->get(route('listings.start'))
+        ->assertRedirect(route('listings.create', ['current_team' => $user->currentTeam->slug]));
 });

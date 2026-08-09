@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Message;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -40,12 +41,21 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'locale' => app()->getLocale(),
             'auth' => [
                 'user' => $user,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'currentTeam' => fn () => $user?->currentTeam ? $user->toUserTeam($user->currentTeam) : null,
             'teams' => fn () => $user?->toUserTeams(includeCurrent: true) ?? [],
+            'unreadMessages' => fn () => $user ? Message::query()
+                ->whereNull('read_at')
+                ->where('sender_id', '!=', $user->id)
+                ->whereHas('conversation', fn ($query) => $query
+                    ->where('renter_id', $user->id)
+                    ->orWhereIn('team_id', $user->teams()->select('teams.id')))
+                ->count() : 0,
+            'unreadNotifications' => fn () => $user?->unreadNotifications()->count() ?? 0,
         ];
     }
 }

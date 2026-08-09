@@ -18,10 +18,13 @@ declare module '@inertiajs/core' {
     export interface InertiaConfig {
         sharedPageProps: {
             name: string;
+            locale: 'es' | 'en';
             auth: Auth;
             sidebarOpen: boolean;
             currentTeam: Team | null;
             teams: Team[];
+            unreadMessages: number;
+            unreadNotifications: number;
             [key: string]: unknown;
         };
     }

@@ -41,4 +41,8 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'nominatim' => [
+        'url' => env('NOMINATIM_URL', 'http://localhost:8089'),
+    ],
+
 ];

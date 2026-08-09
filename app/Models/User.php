@@ -16,6 +16,8 @@ use Illuminate\Support\Carbon;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * @property int $id
@@ -36,13 +38,15 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property-read Collection<int, Team> $ownedTeams
  * @property-read Collection<int, Membership> $teamMemberships
  * @property-read Collection<int, Team> $teams
+ * @property-read Collection<int, Conversation> $conversations
+ * @property-read Collection<int, Message> $sentMessages
  */
-#[Fillable(['name', 'email', 'password', 'current_team_id'])]
+#[Fillable(['name', 'email', 'password', 'current_team_id', 'is_admin'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements PasskeyUser
+class User extends Authenticatable implements HasMedia, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasTeams, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+    use HasFactory, HasTeams, InteractsWithMedia, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     /**
      * Get the properties created by this user.
@@ -55,6 +59,15 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * Photos uploaded via the listing wizard before the listing is saved.
+     * Moved onto the property's `photos` collection once the listing is created/updated.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('pending-listing-photos');
+    }
+
+    /**
      * Get the external identities connected to this user.
      *
      * @return HasMany<OauthIdentity, $this>
@@ -62,6 +75,26 @@ class User extends Authenticatable implements PasskeyUser
     public function oauthIdentities(): HasMany
     {
         return $this->hasMany(OauthIdentity::class);
+    }
+
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class, 'renter_id');
+    }
+
+    public function sentMessages(): HasMany
+    {
+        return $this->hasMany(Message::class, 'sender_id');
+    }
+
+    public function propertyFavorites(): HasMany
+    {
+        return $this->hasMany(PropertyFavorite::class);
+    }
+
+    public function savedSearches(): HasMany
+    {
+        return $this->hasMany(SavedSearch::class);
     }
 
     /**
@@ -75,6 +108,7 @@ class User extends Authenticatable implements PasskeyUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'is_admin' => 'boolean',
         ];
     }
 }

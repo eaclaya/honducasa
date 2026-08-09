@@ -5,6 +5,7 @@ import {
     SidebarGroupLabel,
     SidebarMenu,
     SidebarMenuButton,
+    SidebarMenuBadge,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
@@ -32,6 +33,9 @@ const { isCurrentUrl } = useCurrentUrl();
                         <span>{{ item.title }}</span>
                     </Link>
                 </SidebarMenuButton>
+                <SidebarMenuBadge v-if="item.badge">{{
+                    item.badge > 99 ? '99+' : item.badge
+                }}</SidebarMenuBadge>
             </SidebarMenuItem>
         </SidebarMenu>
     </SidebarGroup>
