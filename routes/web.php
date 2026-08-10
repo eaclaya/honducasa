@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Admin\ModerationController;
+use App\Http\Controllers\Admin\PropertyController as AdminPropertyController;
+use App\Http\Controllers\Admin\TeamController as AdminTeamController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\GoogleCallbackController;
 use App\Http\Controllers\Auth\GoogleRedirectController;
 use App\Http\Controllers\ConversationController;
@@ -21,6 +24,7 @@ use App\Http\Controllers\SavedSearchController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Controllers\UserDashboardController;
 use App\Http\Middleware\EnsureTeamMembership;
+use App\Http\Middleware\EnsureUserIsAdmin;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
@@ -82,8 +86,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::patch('notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
     Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read_all');
-    Route::get('admin/moderation', [ModerationController::class, 'index'])->name('admin.moderation.index');
-    Route::patch('admin/moderation/{report}', [ModerationController::class, 'update'])->name('admin.moderation.update');
 });
+
+/**
+ * Platform administration console. Every route here is admin-only by virtue of
+ * the group middleware, so controllers and form requests must not repeat the
+ * check.
+ */
+Route::middleware(['auth', 'verified', EnsureUserIsAdmin::class])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('moderation', [ModerationController::class, 'index'])->name('moderation.index');
+        Route::patch('moderation/{report}', [ModerationController::class, 'update'])->name('moderation.update');
+
+        Route::get('users', [AdminUserController::class, 'index'])->name('users.index');
+        Route::patch('users/{user}/suspension', [AdminUserController::class, 'updateSuspension'])->name('users.suspension.update');
+        Route::patch('users/{user}/admin-status', [AdminUserController::class, 'updateAdminStatus'])->name('users.admin-status.update');
+
+        Route::get('teams', [AdminTeamController::class, 'index'])->name('teams.index');
+        Route::patch('teams/{team}/suspension', [AdminTeamController::class, 'updateSuspension'])->name('teams.suspension.update');
+        Route::patch('teams/{team}/restore', [AdminTeamController::class, 'restore'])->name('teams.restore')->withTrashed();
+
+        Route::get('properties', [AdminPropertyController::class, 'index'])->name('properties.index');
+        Route::patch('properties/{property}/status', [AdminPropertyController::class, 'updateStatus'])->name('properties.status.update');
+    });
 
 require __DIR__.'/settings.php';

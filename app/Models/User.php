@@ -41,7 +41,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @property-read Collection<int, Conversation> $conversations
  * @property-read Collection<int, Message> $sentMessages
  */
-#[Fillable(['name', 'email', 'password', 'current_team_id', 'is_admin'])]
+#[Fillable(['name', 'email', 'password', 'current_team_id', 'is_admin', 'suspended_at', 'suspension_reason'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements HasMedia, PasskeyUser
 {
@@ -109,6 +109,15 @@ class User extends Authenticatable implements HasMedia, PasskeyUser
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'is_admin' => 'boolean',
+            'suspended_at' => 'datetime',
         ];
+    }
+
+    /**
+     * A suspended account keeps all of its data but is locked out.
+     */
+    public function isSuspended(): bool
+    {
+        return $this->suspended_at !== null;
     }
 }

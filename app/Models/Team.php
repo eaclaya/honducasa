@@ -28,7 +28,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Property> $properties
  * @property-read Collection<int, Conversation> $conversations
  */
-#[Fillable(['name', 'slug', 'is_personal'])]
+#[Fillable(['name', 'slug', 'is_personal', 'suspended_at', 'suspension_reason'])]
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
@@ -121,7 +121,16 @@ class Team extends Model
     {
         return [
             'is_personal' => 'boolean',
+            'suspended_at' => 'datetime',
         ];
+    }
+
+    /**
+     * A suspended team keeps its listings but none of them stay public.
+     */
+    public function isSuspended(): bool
+    {
+        return $this->suspended_at !== null;
     }
 
     /**

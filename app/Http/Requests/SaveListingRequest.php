@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Actions\Listings\SetListingStatus;
 use App\Data\GeoPoint;
 use App\Enums\ApproximateLocationShape;
 use App\Enums\Furnishing;
@@ -116,18 +117,18 @@ class SaveListingRequest extends FormRequest
     }
 
     /**
-     * A listing with no photos can never go public, so a publish request for one
-     * is quietly downgraded to a draft instead of rejected.
+     * Defer to `SetListingStatus` so the "no photos means draft" rule is
+     * identical here and in the moderation console.
      */
     private function statusAllowedByPhotos(): mixed
     {
-        $status = $this->input('status');
+        $status = ListingStatus::tryFrom((string) $this->input('status'));
 
-        if ($status !== ListingStatus::Published->value || filled($this->input('images'))) {
-            return $status;
+        if ($status === null) {
+            return $this->input('status');
         }
 
-        return ListingStatus::Draft->value;
+        return SetListingStatus::allowedFor($status, count($this->array('images')))->value;
     }
 
     /** @return list<callable(Validator): void> */

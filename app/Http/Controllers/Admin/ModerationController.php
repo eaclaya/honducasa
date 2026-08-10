@@ -7,16 +7,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ResolveConversationReportRequest;
 use App\Models\ConversationReport;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ModerationController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(): Response
     {
-        abort_unless($request->user()->is_admin, 403);
-
         $reports = ConversationReport::query()
             ->select(['id', 'conversation_id', 'reporter_id', 'reason', 'details', 'status', 'created_at'])
             ->with(['reporter:id,name', 'conversation:id,property_id,team_id,renter_id,status', 'conversation.property:id,name,slug', 'conversation.team:id,name', 'conversation.renter:id,name'])

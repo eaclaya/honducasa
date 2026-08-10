@@ -5,10 +5,12 @@ import {
     Building2,
     Compass,
     Heart,
+    Home,
     LayoutGrid,
     MessageCircle,
     Search,
     ShieldAlert,
+    Users,
 } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -26,6 +28,9 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard, home } from '@/routes';
 import { index as moderation } from '@/routes/admin/moderation';
+import { index as adminProperties } from '@/routes/admin/properties';
+import { index as adminTeams } from '@/routes/admin/teams';
+import { index as adminUsers } from '@/routes/admin/users';
 import { index as favorites } from '@/routes/favorites';
 import { index as listings } from '@/routes/listings';
 import { show as messages } from '@/routes/messages';
@@ -96,8 +101,29 @@ const mainNavItems = computed<NavItem[]>(() => [
         icon: Bell,
         badge: page.props.unreadNotifications,
     },
-    ...(page.props.auth.user?.is_admin
+]);
+
+const isAdmin = computed(() => page.props.auth.user?.is_admin === true);
+
+const adminNavItems = computed<NavItem[]>(() =>
+    isAdmin.value
         ? [
+              {
+                  title: page.props.locale === 'es' ? 'Usuarios' : 'Users',
+                  href: adminUsers().url,
+                  icon: Users,
+              },
+              {
+                  title: page.props.locale === 'es' ? 'Equipos' : 'Teams',
+                  href: adminTeams().url,
+                  icon: Building2,
+              },
+              {
+                  title:
+                      page.props.locale === 'es' ? 'Propiedades' : 'Properties',
+                  href: adminProperties().url,
+                  icon: Home,
+              },
               {
                   title:
                       page.props.locale === 'es' ? 'Moderación' : 'Moderation',
@@ -105,8 +131,8 @@ const mainNavItems = computed<NavItem[]>(() => [
                   icon: ShieldAlert,
               },
           ]
-        : []),
-]);
+        : [],
+);
 </script>
 
 <template>
@@ -130,6 +156,15 @@ const mainNavItems = computed<NavItem[]>(() => [
 
         <SidebarContent>
             <NavMain :items="mainNavItems" />
+            <NavMain
+                v-if="isAdmin"
+                :items="adminNavItems"
+                :label="
+                    page.props.locale === 'es'
+                        ? 'Administración'
+                        : 'Administration'
+                "
+            />
         </SidebarContent>
 
         <SidebarFooter>
