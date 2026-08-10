@@ -7,6 +7,7 @@ use App\Enums\LocationType;
 use App\Enums\PropertyType;
 use App\Models\Location;
 use App\Models\Property;
+use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -235,4 +236,15 @@ test('nearby search coordinates must be supplied together and valid', function (
 
     $this->get(route('rentals.index', ['latitude' => 91, 'longitude' => -87.1921]))
         ->assertSessionHasErrors(['latitude']);
+});
+
+test('published properties from a suspended team do not appear in search results', function () {
+    $suspendedTeam = Team::factory()->create(['suspended_at' => now()]);
+    Property::factory()->create(['name' => 'Visible home']);
+    Property::factory()->create(['name' => 'Hidden home', 'team_id' => $suspendedTeam->id]);
+
+    $this->get(route('rentals.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('properties.data', 1)
+            ->where('properties.data.0.name', 'Visible home'));
 });

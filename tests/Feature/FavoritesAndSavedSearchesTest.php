@@ -2,6 +2,7 @@
 
 use App\Models\Property;
 use App\Models\SavedSearch;
+use App\Models\Team;
 use App\Models\User;
 
 test('verified users can add and remove a published property favorite', function () {
@@ -13,6 +14,27 @@ test('verified users can add and remove a published property favorite', function
 
     $this->actingAs($user)->delete(route('favorites.destroy', $property))->assertRedirect();
     $this->assertDatabaseMissing('property_favorites', ['user_id' => $user->id, 'property_id' => $property->id]);
+});
+
+test('a property from a suspended team cannot be favorited', function () {
+    $user = User::factory()->create(['email_verified_at' => now()]);
+    $suspendedTeam = Team::factory()->create(['suspended_at' => now()]);
+    $property = Property::factory()->create(['team_id' => $suspendedTeam->id]);
+
+    $this->actingAs($user)->post(route('favorites.store', $property))->assertNotFound();
+    $this->assertDatabaseMissing('property_favorites', ['user_id' => $user->id, 'property_id' => $property->id]);
+});
+
+test('favorites from a since-suspended team are hidden from the favorites list', function () {
+    $user = User::factory()->create(['email_verified_at' => now()]);
+    $suspendedTeam = Team::factory()->create();
+    $property = Property::factory()->create(['team_id' => $suspendedTeam->id]);
+    $user->propertyFavorites()->create(['property_id' => $property->id]);
+
+    $suspendedTeam->update(['suspended_at' => now()]);
+
+    $this->actingAs($user)->get(route('favorites.index'))
+        ->assertInertia(fn ($page) => $page->component('favorites/Index')->has('favorites.data', 0));
 });
 
 test('favorites are private to their owner', function () {

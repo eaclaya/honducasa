@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Data\GeoPoint;
-use App\Enums\ListingStatus;
 use App\Models\Property;
 use App\Models\SavedSearch;
 use App\Notifications\SavedSearchMatchesFound;
@@ -39,7 +38,7 @@ class SendSavedSearchAlerts extends Command
         $since = $search->last_notified_at ?? $search->created_at;
 
         return Property::query()
-            ->where('status', ListingStatus::Published)
+            ->visibleToPublic()
             ->where('published_at', '>', $since)
             ->when($filters['location'] ?? null, fn (Builder $query, string $location) => $query->whereHas('location', fn (Builder $locationQuery) => $locationQuery->matchingHierarchy($location)))
             ->when($filters['property_type'] ?? null, fn (Builder $query, string $value) => $query->where('type', $value))

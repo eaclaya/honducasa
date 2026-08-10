@@ -4,6 +4,7 @@ use App\Enums\ListingStatus;
 use App\Enums\LocationType;
 use App\Models\Location;
 use App\Models\Property;
+use App\Models\Team;
 
 test('active Honduran locations can be searched without accent marks', function () {
     $department = Location::factory()->create([
@@ -44,6 +45,20 @@ test('location suggestions only count published properties', function () {
     ]);
     Property::factory()->for($city)->create();
     Property::factory()->for($city)->create(['status' => ListingStatus::Draft]);
+
+    $this->getJson(route('locations.search', ['q' => 'tegu']))
+        ->assertOk()
+        ->assertJsonPath('data.0.listingCount', 1);
+});
+
+test('location suggestions do not count properties from a suspended team', function () {
+    $city = Location::factory()->create([
+        'name' => 'Tegucigalpa',
+        'slug' => 'tegucigalpa',
+    ]);
+    $suspendedTeam = Team::factory()->create(['suspended_at' => now()]);
+    Property::factory()->for($city)->create();
+    Property::factory()->for($city)->create(['team_id' => $suspendedTeam->id]);
 
     $this->getJson(route('locations.search', ['q' => 'tegu']))
         ->assertOk()

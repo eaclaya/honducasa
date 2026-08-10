@@ -15,7 +15,7 @@ class PropertyFavoriteController extends Controller
     {
         $favorites = $request->user()->propertyFavorites()
             ->with(['property.location:id,name', 'property.media'])
-            ->whereHas('property', fn ($query) => $query->where('status', ListingStatus::Published))
+            ->whereHas('property', fn ($query) => $query->visibleToPublic())
             ->latest()->paginate(18)->withQueryString()
             ->through(fn ($favorite) => [
                 'slug' => $favorite->property->slug,
@@ -32,7 +32,7 @@ class PropertyFavoriteController extends Controller
 
     public function store(Request $request, Property $property): RedirectResponse
     {
-        abort_unless($property->status === ListingStatus::Published, 404);
+        abort_unless($property->status === ListingStatus::Published && ! $property->team->isSuspended(), 404);
         $request->user()->propertyFavorites()->firstOrCreate(['property_id' => $property->id]);
 
         return back();

@@ -14,13 +14,13 @@ class PropertyShowController extends Controller
      */
     public function __invoke(Property $property): Response
     {
-        abort_unless($property->status === ListingStatus::Published, 404);
         $property->load([
             'creator:id,name',
             'media',
             'location:id,name',
-            'team:id,name,slug',
+            'team:id,name,slug,suspended_at',
         ]);
+        abort_unless($property->status === ListingStatus::Published && ! $property->team->isSuspended(), 404);
 
         $mapPoint = Property::query()
             ->whereKey($property->id)
@@ -30,7 +30,7 @@ class PropertyShowController extends Controller
 
         $related = Property::query()
             ->with(['location:id,name', 'media'])
-            ->where('status', ListingStatus::Published)
+            ->visibleToPublic()
             ->where('location_id', $property->location_id)
             ->where('listing_type', $property->listing_type)
             ->where('type', $property->type)

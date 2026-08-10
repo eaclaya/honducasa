@@ -5,7 +5,9 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Features;
 use Laravel\Passkeys\Contracts\PasskeyLoginResponse;
@@ -104,6 +106,53 @@ test('users can not authenticate with invalid password', function () {
         'email' => $user->email,
         'password' => 'wrong-password',
     ]);
+
+    $this->assertGuest();
+});
+
+test('a suspended user cannot authenticate even with the correct password', function () {
+    $user = User::factory()->create([
+        'suspended_at' => now(),
+        'suspension_reason' => 'Spam',
+    ]);
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $this->assertGuest();
+    $response->assertSessionHasErrors('email');
+});
+
+test('a suspended user with two-factor enabled is rejected before the two-factor challenge', function () {
+    if (! Features::canManageTwoFactorAuthentication()) {
+        $this->markTestSkipped('Two-factor authentication is not enabled.');
+    }
+
+    Features::twoFactorAuthentication([
+        'confirm' => true,
+        'confirmPassword' => true,
+    ]);
+
+    $user = User::factory()->withTwoFactor()->create([
+        'suspended_at' => now(),
+    ]);
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $this->assertGuest();
+    $response->assertSessionHasErrors('email');
+    $response->assertSessionMissing('login.id');
+});
+
+test('logging in a suspended user directly, as passkey login does, is rejected', function () {
+    $user = User::factory()->create(['suspended_at' => now()]);
+
+    expect(fn () => Auth::login($user))->toThrow(ValidationException::class);
 
     $this->assertGuest();
 });

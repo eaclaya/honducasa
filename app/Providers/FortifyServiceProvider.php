@@ -10,11 +10,14 @@ use App\Http\Responses\RegisterResponse;
 use App\Http\Responses\TwoFactorLoginResponse;
 use App\Http\Responses\VerifyEmailResponse;
 use App\Models\TeamInvitation;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
@@ -55,6 +58,25 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
+
+        // Fortify calls this same callback both to decide whether to show the
+        // two-factor challenge and, later, to complete the login — so a
+        // suspended account is rejected before it ever reaches that screen.
+        Fortify::authenticateUsing(function (Request $request) {
+            $user = User::query()->where(Fortify::username(), $request->input(Fortify::username()))->first();
+
+            if (! $user || ! Hash::check($request->password, $user->password)) {
+                return null;
+            }
+
+            if ($user->isSuspended()) {
+                throw ValidationException::withMessages([
+                    Fortify::username() => __('This account has been suspended.'),
+                ]);
+            }
+
+            return $user;
+        });
     }
 
     /**

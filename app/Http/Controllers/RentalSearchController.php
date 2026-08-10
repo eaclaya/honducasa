@@ -26,7 +26,7 @@ class RentalSearchController extends Controller
         $favoritePropertyIds = $request->user()?->propertyFavorites()->pluck('property_id')->all() ?? [];
 
         $query = Property::query()
-            ->where('status', 'published')
+            ->visibleToPublic()
             ->selectRaw("properties.*, CASE WHEN public_location_precision = 'exact' THEN ROUND(ST_Y(coordinates::geometry)::numeric, 2) ELSE ST_Y(coordinates::geometry) END AS map_latitude")
             ->selectRaw("CASE WHEN public_location_precision = 'exact' THEN ROUND(ST_X(coordinates::geometry)::numeric, 2) ELSE ST_X(coordinates::geometry) END AS map_longitude")
             ->with(['location:id,name', 'media'])

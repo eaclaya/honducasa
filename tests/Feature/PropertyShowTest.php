@@ -3,6 +3,7 @@
 use App\Enums\ListingType;
 use App\Enums\PropertyType;
 use App\Models\Property;
+use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -74,4 +75,25 @@ test('property detail routes bind by slug', function () {
 
     $this->get('/properties/'.$property->id)->assertNotFound();
     $this->get('/properties/'.$property->slug)->assertOk();
+});
+
+test('a property page 404s when its team is suspended', function () {
+    $suspendedTeam = Team::factory()->create(['suspended_at' => now()]);
+    $property = Property::factory()->create(['team_id' => $suspendedTeam->id]);
+
+    $this->get(route('properties.show', $property))->assertNotFound();
+});
+
+test('a suspended team\'s properties are excluded from the related listings sidebar', function () {
+    $property = Property::factory()->create();
+    $suspendedTeam = Team::factory()->create(['suspended_at' => now()]);
+    Property::factory()->create([
+        'team_id' => $suspendedTeam->id,
+        'location_id' => $property->location_id,
+        'listing_type' => $property->listing_type,
+        'type' => $property->type,
+    ]);
+
+    $this->get(route('properties.show', $property))
+        ->assertInertia(fn (Assert $page) => $page->has('related', 0));
 });

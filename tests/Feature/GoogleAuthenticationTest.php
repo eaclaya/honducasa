@@ -64,6 +64,28 @@ test('a returning Google identity authenticates the linked user without duplicat
     expect(OauthIdentity::query()->count())->toBe(1);
 });
 
+test('a suspended user cannot authenticate via Google', function () {
+    $user = User::factory()->create(['suspended_at' => now()]);
+    OauthIdentity::factory()->for($user)->create([
+        'provider_subject' => 'google-subject-suspended',
+        'provider_email' => $user->email,
+    ]);
+
+    Socialite::fake('google', SocialiteUser::fake([
+        'id' => 'google-subject-suspended',
+        'name' => $user->name,
+        'email' => $user->email,
+        'email_verified' => true,
+    ]));
+
+    $response = $this->get(route('auth.google.callback'));
+
+    $this->assertGuest();
+    $response
+        ->assertRedirect(route('login'))
+        ->assertSessionHasErrors('google');
+});
+
 test('Google does not silently link an existing manual account by email', function () {
     User::factory()->create(['email' => 'existing@example.com']);
 

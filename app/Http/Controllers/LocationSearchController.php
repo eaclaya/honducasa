@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\ListingStatus;
 use App\Enums\LocationType;
 use App\Http\Requests\LocationSearchRequest;
 use App\Models\Location;
@@ -20,8 +19,7 @@ class LocationSearchController extends Controller
             ->matchingSearch($request->string('q')->toString())
             ->with('parent.parent.parent')
             ->withCount([
-                'properties as listing_count' => fn (Builder $query) => $query
-                    ->where('status', ListingStatus::Published),
+                'properties as listing_count' => fn (Builder $query) => $query->visibleToPublic(),
             ])
             ->orderByDesc('listing_count')
             ->orderBy('name')

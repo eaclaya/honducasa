@@ -4,6 +4,7 @@ use App\Enums\ListingType;
 use App\Models\Location;
 use App\Models\Property;
 use App\Models\SavedSearch;
+use App\Models\Team;
 use App\Models\User;
 use App\Notifications\SavedSearchMatchesFound;
 use Illuminate\Support\Facades\Notification;
@@ -35,6 +36,28 @@ test('the command does not notify for old or nonmatching listings', function () 
         'created_at' => now()->subHour(),
     ]);
     Property::factory()->create(['location_id' => $location->id, 'published_at' => now()]);
+
+    $this->artisan('app:send-saved-search-alerts')->assertSuccessful();
+
+    Notification::assertNothingSent();
+});
+
+test('the command does not notify about listings from a suspended team', function () {
+    Notification::fake();
+    $user = User::factory()->create();
+    $location = Location::factory()->create(['name' => 'Tegucigalpa']);
+    SavedSearch::factory()->create([
+        'user_id' => $user->id,
+        'filters' => ['location' => 'Tegucigalpa', 'listing_type' => 'rent'],
+        'created_at' => now()->subHour(),
+    ]);
+    $suspendedTeam = Team::factory()->create(['suspended_at' => now()]);
+    Property::factory()->create([
+        'team_id' => $suspendedTeam->id,
+        'location_id' => $location->id,
+        'listing_type' => ListingType::Rent,
+        'published_at' => now(),
+    ]);
 
     $this->artisan('app:send-saved-search-alerts')->assertSuccessful();
 

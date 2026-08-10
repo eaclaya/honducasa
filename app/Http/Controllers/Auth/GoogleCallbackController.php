@@ -27,6 +27,10 @@ class GoogleCallbackController extends Controller
             }
 
             $user = $resolveGoogleUser->handle($googleUser);
+
+            if ($user->isSuspended()) {
+                throw new DomainException(__('This account has been suspended.'));
+            }
         } catch (DomainException $exception) {
             return $this->failedRedirect($request, $exception->getMessage());
         } catch (Throwable $exception) {

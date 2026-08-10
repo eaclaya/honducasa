@@ -186,6 +186,23 @@ class Property extends Model implements HasMedia
     }
 
     /**
+     * Limit properties to those a visitor may see: published, and owned by a
+     * team that isn't suspended. This is the single home of "public" — every
+     * search, show page, and notification query filters through here so a
+     * suspended team's listings can't surface anywhere outside its own console.
+     *
+     * @param  Builder<Property>  $query
+     * @return Builder<Property>
+     */
+    #[Scope]
+    protected function visibleToPublic(Builder $query): Builder
+    {
+        return $query
+            ->where('status', ListingStatus::Published)
+            ->whereHas('team', fn (Builder $team) => $team->whereNull('suspended_at'));
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
