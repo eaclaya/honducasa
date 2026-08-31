@@ -93,6 +93,8 @@ type RelatedProperty = {
 const props = defineProps<{
     property: PropertyDetails;
     related: RelatedProperty[];
+    isPreview?: boolean;
+    status?: string;
 }>();
 const page = usePage();
 const locale = computed(() => page.props.locale);
@@ -290,6 +292,23 @@ const toggleFavorite = (): void => {
         class="public-site min-h-screen bg-[var(--public-surface)] text-[var(--public-text)]"
     >
         <PublicHeader />
+
+        <p
+            v-if="isPreview"
+            class="bg-amber-100 px-4 py-3 text-center text-sm font-semibold text-amber-900"
+        >
+            {{
+                status === 'published'
+                    ? tr(
+                          'Vista previa. Así ven tu propiedad las personas que visitan HonduCasa.',
+                          'Preview. This is how visitors see your listing on HonduCasa.',
+                      )
+                    : tr(
+                          'Vista previa. Esta propiedad todavía no es visible al público.',
+                          'Preview. This listing is not visible to the public yet.',
+                      )
+            }}
+        </p>
 
         <main class="public-container py-8">
             <Link

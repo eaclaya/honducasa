@@ -12,10 +12,12 @@ use App\Models\Location;
 use App\Models\Property;
 use App\Models\Team;
 use App\Support\CurrencyConverter;
+use App\Support\ListingPhotoEnhancementQuota;
 use App\Support\NearestCity;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -25,7 +27,10 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class ListingController extends Controller
 {
-    public function __construct(private CurrencyConverter $currencyConverter) {}
+    public function __construct(
+        private CurrencyConverter $currencyConverter,
+        private ListingPhotoEnhancementQuota $photoEnhancementQuota,
+    ) {}
 
     public function index(Request $request, ?Team $currentTeam = null): Response
     {
@@ -33,12 +38,14 @@ class ListingController extends Controller
             ?? $request->user()->createdProperties()->whereNull('team_id');
 
         return Inertia::render('listings/Index', [
-            'listings' => $listings->with('media')->latest('id')->get()->map(fn (Property $property) => [
-                'id' => $property->id, 'slug' => $property->slug, 'name' => $property->name,
-                'status' => $property->status->value, 'listingType' => $property->listing_type->value,
-                'priceAmount' => $property->price_amount, 'currency' => $property->currency,
-                'image' => $property->getFirstMediaUrl('photos', 'thumb') ?: null,
-            ]),
+            'listings' => $listings->with('media')->latest('id')
+                ->paginate(18)->withQueryString()
+                ->through(fn (Property $property) => [
+                    'id' => $property->id, 'slug' => $property->slug, 'name' => $property->name,
+                    'status' => $property->status->value, 'listingType' => $property->listing_type->value,
+                    'priceAmount' => $property->price_amount, 'currency' => $property->currency,
+                    'image' => $property->getFirstMediaUrl('photos', 'thumb') ?: null,
+                ]),
         ]);
     }
 
@@ -56,6 +63,11 @@ class ListingController extends Controller
             'locations' => $this->locations(),
             'currencies' => $this->currencyConverter->supportedCurrencies(),
             'oldInput' => $request->old(),
+            'photoEnhancementsRemaining' => $this->photoEnhancementQuota->remaining(
+                $request->user(),
+                null,
+                $this->photoEnhancementQuota->draftKey($request),
+            ),
         ]);
     }
 
@@ -82,6 +94,7 @@ class ListingController extends Controller
             $property->setAttribute('coordinates', $this->coordinates($request)->toPostgisPoint());
             $property->save();
             $this->syncImages($property, $request);
+            $this->photoEnhancementQuota->claimDraft($request, $request->user(), $property);
             $savedStatus = app(SetListingStatus::class)->handle($property, $requestedStatus);
         });
 
@@ -130,6 +143,11 @@ class ListingController extends Controller
             'locations' => $this->locations(),
             'currencies' => $this->currencyConverter->supportedCurrencies(),
             'oldInput' => $request->old(),
+            'photoEnhancementsRemaining' => $this->photoEnhancementQuota->remaining(
+                $request->user(),
+                $listing,
+                $this->photoEnhancementQuota->draftKey($request),
+            ),
         ]);
     }
 
@@ -258,7 +276,9 @@ class ListingController extends Controller
      */
     private function syncImages(Property $property, SaveListingRequest $request): void
     {
-        $submittedIds = collect($request->input('images', []))->map(fn ($id) => (int) $id);
+        $submittedIds = $this->withoutSupersededOriginals(
+            collect($request->input('images', []))->map(fn ($id) => (int) $id)
+        );
 
         $property->getMedia('photos')
             ->reject(fn (Media $media) => $submittedIds->contains($media->id))
@@ -282,6 +302,39 @@ class ListingController extends Controller
         $orderedMedia->values()->each(
             fn (Media $media, int $index) => $media->update(['order_column' => $index + 1]),
         );
+    }
+
+    /**
+     * Drop any photo whose AI-enhanced replacement is being saved alongside it,
+     * and delete it outright so it can't be re-attached later.
+     *
+     * `EnhanceListingPhoto` stamps each candidate with the `source_media_id` it
+     * was generated from, which is what makes the pairing knowable here. The
+     * form already removes the original when an enhancement is accepted; this
+     * is the guarantee that survives a client that didn't, which is how the
+     * same room ended up rendered twice in the uploader.
+     *
+     * @param  SupportCollection<int, int>  $submittedIds
+     * @return SupportCollection<int, int>
+     */
+    private function withoutSupersededOriginals(SupportCollection $submittedIds): SupportCollection
+    {
+        $supersededIds = Media::query()
+            ->whereIn('id', $submittedIds)
+            ->get()
+            ->map(fn (Media $media) => $media->getCustomProperty('ai_enhanced') === true
+                ? (int) $media->getCustomProperty('source_media_id')
+                : 0)
+            ->filter()
+            ->values();
+
+        if ($supersededIds->isEmpty()) {
+            return $submittedIds;
+        }
+
+        Media::query()->whereIn('id', $supersededIds)->get()->each->delete();
+
+        return $submittedIds->reject(fn (int $id) => $supersededIds->contains($id))->values();
     }
 
     /**

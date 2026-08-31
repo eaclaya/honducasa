@@ -11,6 +11,7 @@ use App\Http\Responses\TwoFactorLoginResponse;
 use App\Http\Responses\VerifyEmailResponse;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -49,6 +50,31 @@ class FortifyServiceProvider extends ServiceProvider
         $this->configureActions();
         $this->configureViews();
         $this->configureRateLimiting();
+        $this->configureAuthenticatedRedirects();
+    }
+
+    /**
+     * Tell the `guest` middleware where to send an already-authenticated user.
+     *
+     * Laravel's default picks the first route named `dashboard`/`home` and
+     * calls `route()` on it with no parameters — but ours is
+     * `{current_team}/dashboard`, so the default throws
+     * `UrlGenerationException` for anyone without a team (every renter, and
+     * any agency user who hasn't switched into one yet) the moment they hit a
+     * guest route while logged in: /login, /register, or the Google OAuth
+     * round-trip. Mirrors `RedirectsToCurrentTeam`: team dashboard when there
+     * is a team, the user-scoped one otherwise.
+     */
+    private function configureAuthenticatedRedirects(): void
+    {
+        RedirectIfAuthenticated::redirectUsing(function (Request $request): string {
+            $user = $request->user();
+            $team = $user?->currentTeam ?? $user?->fallbackTeam();
+
+            return $team
+                ? route('dashboard', ['current_team' => $team->slug])
+                : route('user.dashboard');
+        });
     }
 
     /**

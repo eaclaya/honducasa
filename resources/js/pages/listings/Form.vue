@@ -3,6 +3,7 @@ import { Form, Head, Link, usePage } from '@inertiajs/vue3';
 import {
     ArrowLeft,
     Check,
+    Eye,
     ImageOff,
     ImagePlus,
     Loader2,
@@ -24,6 +25,10 @@ import vueFilePond from 'vue-filepond';
 import ListingPublishModal from '@/components/ListingPublishModal.vue';
 import PropertyLocationPicker from '@/components/PropertyLocationPicker.vue';
 import { index, store, update } from '@/routes/listings';
+import {
+    preview as propertyPreview,
+    show as propertyShow,
+} from '@/routes/properties';
 import {
     destroy as destroyUpload,
     enhance as enhanceUpload,
@@ -90,6 +95,7 @@ const props = defineProps<{
     locations: Location[];
     currencies: string[];
     oldInput: Record<string, FormValue>;
+    photoEnhancementsRemaining: number;
 }>();
 const page = usePage();
 const locale = computed(() => page.props.locale);
@@ -221,6 +227,18 @@ const enhancementSource = ref<EnhanceablePhoto | null>(null);
 const enhancedCandidate = ref<PhotoCandidate | null>(null);
 const enhancingPhotoId = ref<number | null>(null);
 const enhancementError = ref('');
+const enhancementsRemaining = ref(props.photoEnhancementsRemaining);
+const publicUrl = computed(() => {
+    const slug = props.listing?.slug;
+
+    if (typeof slug !== 'string') {
+        return null;
+    }
+
+    return props.listing?.status === 'published'
+        ? propertyShow.url(slug)
+        : propertyPreview.url(slug);
+});
 
 const parseJson = async (
     response: Response,
@@ -289,18 +307,30 @@ const enhancePhoto = async (photo: EnhanceablePhoto): Promise<void> => {
             headers: {
                 'X-XSRF-TOKEN': csrfToken(),
                 Accept: 'application/json',
+                'Content-Type': 'application/json',
             },
             credentials: 'same-origin',
+            body: JSON.stringify({ listing: props.listing?.id ?? null }),
         });
         const body = await parseJson(response);
 
         if (!response.ok) {
+            const errors = body.errors as Record<string, string[]> | undefined;
+            const serverMessage =
+                errors?.media?.[0] ??
+                (typeof body.message === 'string' ? body.message : null);
+
             throw new Error(
-                tr(
-                    'No se pudo iniciar la mejora de la foto.',
-                    'The photo enhancement could not be started.',
-                ),
+                serverMessage ??
+                    tr(
+                        'No se pudo iniciar la mejora de la foto.',
+                        'The photo enhancement could not be started.',
+                    ),
             );
+        }
+
+        if (typeof body.remaining === 'number') {
+            enhancementsRemaining.value = body.remaining;
         }
 
         if (typeof body.request_id !== 'string') {
@@ -357,9 +387,18 @@ const useEnhancedPhoto = async (): Promise<void> => {
         type: 'local',
     });
     pondFileIdByMediaId.set(candidate.id, candidateFile.id);
-    photoPond.value.removeFile(
-        pondFileIdByMediaId.get(source.id) ?? String(source.id),
-    );
+
+    // The enhanced copy replaces the original rather than joining it. Removing
+    // an uploaded original also reverts it server-side; an original already on
+    // the listing is dropped by `syncImages` once it isn't submitted.
+    const sourcePondId = pondFileIdByMediaId.get(source.id);
+
+    if (sourcePondId) {
+        photoPond.value.removeFile(sourcePondId);
+    }
+
+    pondFileIdByMediaId.delete(source.id);
+    photoById.delete(String(source.id));
     enhanceablePhotos.value = enhanceablePhotos.value.filter(
         (photo) => photo.id !== source.id,
     );
@@ -370,6 +409,20 @@ const useEnhancedPhoto = async (): Promise<void> => {
 const onPhotoProcessed = (error: unknown, file: FilePondFile): void => {
     if (!error && file.serverId) {
         pondFileIdByMediaId.set(Number(file.serverId), file.id);
+    }
+};
+
+/**
+ * Register photos that arrive already stored — the listing's existing photos,
+ * and an accepted enhancement — which never fire `processfile`. Without this
+ * their pond file id is unknown and `removeFile()` silently no-ops, leaving
+ * the original sitting next to the enhanced copy.
+ */
+const onPhotoAdded = (error: unknown, file: FilePondFile): void => {
+    const mediaId = Number(file.serverId || file.source);
+
+    if (!error && Number.isFinite(mediaId) && mediaId > 0) {
+        pondFileIdByMediaId.set(mediaId, file.id);
     }
 };
 
@@ -401,16 +454,24 @@ const filePondServer = {
         fetch(storeUpload().url, {
             method: 'POST',
             body,
-            headers: { 'X-XSRF-TOKEN': csrfToken() },
+            headers: {
+                'X-XSRF-TOKEN': csrfToken(),
+                Accept: 'application/json',
+            },
             credentials: 'same-origin',
         })
             .then(async (response) => {
                 if (!response.ok) {
+                    const responseBody = await parseJson(response);
+                    const errors = responseBody.errors as
+                        Record<string, string[]> | undefined;
+
                     error(
-                        tr(
-                            'No se pudo subir la foto.',
-                            'The photo failed to upload.',
-                        ),
+                        errors?.file?.[0] ??
+                            tr(
+                                'No se pudo subir la foto.',
+                                'The photo failed to upload.',
+                            ),
                     );
 
                     return;
@@ -633,27 +694,43 @@ const confirmSave = (status: SaveStatus, submit: () => void): void => {
                     : tr('Volver al panel', 'Back to dashboard')
             }}</Link
         >
-        <div class="mt-6">
-            <h1 class="text-3xl font-semibold">
+        <div class="mt-6 flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <h1 class="text-3xl font-semibold">
+                    {{
+                        listing
+                            ? tr('Editar propiedad', 'Edit listing')
+                            : tr('Publicar propiedad', 'List a property')
+                    }}
+                </h1>
+                <p class="mt-2 text-muted-foreground">
+                    {{
+                        listing
+                            ? tr(
+                                  'Actualiza cualquier sección y guarda los cambios.',
+                                  'Update any section and save your changes.',
+                              )
+                            : tr(
+                                  'Completa la información y guarda como borrador o publica.',
+                                  'Complete the details and save as draft or publish.',
+                              )
+                    }}
+                </p>
+            </div>
+            <a
+                v-if="publicUrl"
+                :href="publicUrl"
+                target="_blank"
+                rel="noopener"
+                class="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold hover:bg-muted"
+            >
+                <Eye class="size-4" />
                 {{
-                    listing
-                        ? tr('Editar propiedad', 'Edit listing')
-                        : tr('Publicar propiedad', 'List a property')
+                    listing?.status === 'published'
+                        ? tr('Ver publicación', 'View listing')
+                        : tr('Vista previa', 'Preview')
                 }}
-            </h1>
-            <p class="mt-2 text-muted-foreground">
-                {{
-                    listing
-                        ? tr(
-                              'Actualiza cualquier sección y guarda los cambios.',
-                              'Update any section and save your changes.',
-                          )
-                        : tr(
-                              'Completa la información y guarda como borrador o publica.',
-                              'Complete the details and save as draft or publish.',
-                          )
-                }}
-            </p>
+            </a>
         </div>
 
         <Form
@@ -1058,6 +1135,7 @@ const confirmSave = (status: SaveStatus, submit: () => void): void => {
                     "
                     :server="filePondServer"
                     :files="initialFiles"
+                    @addfile="onPhotoAdded"
                     @processfile="onPhotoProcessed"
                     @removefile="onPhotoRemoved"
                     @updatefiles="photoCount = $event.length"
@@ -1071,17 +1149,30 @@ const confirmSave = (status: SaveStatus, submit: () => void): void => {
                             <p class="font-semibold">
                                 {{
                                     tr(
-                                        'Mejora tus fotos con IA',
-                                        'Improve your photos with AI',
+                                        'Mejoras tu fotos para que luzcan mas profesionales.',
+                                        'Improve your photos so they look more professional.',
                                     )
                                 }}
                             </p>
                             <p class="text-sm text-muted-foreground">
                                 {{
                                     tr(
-                                        'La IA crea una versión mejorada. Siempre podrás comparar y elegir antes de reemplazar la original.',
-                                        'AI creates an enhanced version. You will always compare and choose before the original is replaced.',
+                                        'Deja que la inteligencia artificial te ayude a mejorar tus fotos, puedes escoger hasta 5 fotos',
+                                        'Let AI help you improve your photos — you can choose up to 5 photos.',
                                     )
+                                }}
+                            </p>
+                            <p class="mt-1 text-sm font-semibold">
+                                {{
+                                    enhancementsRemaining > 0
+                                        ? tr(
+                                              `Te quedan ${enhancementsRemaining} mejoras para esta propiedad.`,
+                                              `You have ${enhancementsRemaining} enhancements left for this listing.`,
+                                          )
+                                        : tr(
+                                              'Ya usaste todas las mejoras de esta propiedad.',
+                                              'You have used every enhancement for this listing.',
+                                          )
                                 }}
                             </p>
                         </div>
@@ -1101,7 +1192,10 @@ const confirmSave = (status: SaveStatus, submit: () => void): void => {
                             />
                             <button
                                 type="button"
-                                :disabled="enhancingPhotoId !== null"
+                                :disabled="
+                                    enhancingPhotoId !== null ||
+                                    enhancementsRemaining < 1
+                                "
                                 class="flex w-full items-center justify-center gap-2 border-t px-3 py-2 text-sm font-semibold text-primary hover:bg-muted disabled:opacity-50"
                                 @click="enhancePhoto(photo)"
                             >

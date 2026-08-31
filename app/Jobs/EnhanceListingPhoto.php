@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\User;
+use App\Services\ListingPhotoCompressor;
 use App\Services\OpenAiPropertyPhotoEnhancer;
 use App\Support\PhotoEnhancementStatus;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,16 +32,27 @@ class EnhanceListingPhoto implements ShouldQueue
     public function handle(
         OpenAiPropertyPhotoEnhancer $photoEnhancer,
         PhotoEnhancementStatus $status,
+        ListingPhotoCompressor $photoCompressor,
     ): void {
         $status->put($this->userId, $this->requestId, ['status' => 'processing']);
 
         $media = Media::query()->findOrFail($this->mediaId);
         $user = User::query()->findOrFail($this->userId);
         $enhancedImage = $photoEnhancer->enhance($media);
-        $candidate = $user->addMediaFromString($enhancedImage)
-            ->usingFileName('enhanced-'.Str::uuid().'.png')
-            ->withCustomProperties(['ai_enhanced' => true, 'source_media_id' => $media->getKey()])
-            ->toMediaCollection('pending-listing-photos');
+
+        $rawPath = tempnam(sys_get_temp_dir(), 'enhanced-photo-');
+        file_put_contents($rawPath, $enhancedImage);
+        $compressedPath = $photoCompressor->compress($rawPath);
+        @unlink($rawPath);
+
+        try {
+            $candidate = $user->addMedia($compressedPath)
+                ->usingFileName('enhanced-'.Str::uuid().'.webp')
+                ->withCustomProperties(['ai_enhanced' => true, 'source_media_id' => $media->getKey()])
+                ->toMediaCollection('pending-listing-photos');
+        } finally {
+            @unlink($compressedPath);
+        }
 
         $status->put($this->userId, $this->requestId, [
             'status' => 'completed',

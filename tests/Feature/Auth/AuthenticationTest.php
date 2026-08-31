@@ -217,3 +217,35 @@ test('users are rate limited', function () {
 
     $response->assertTooManyRequests();
 });
+
+test('an authenticated user without a team is redirected off guest routes to the user dashboard', function () {
+    $user = User::factory()->create();
+
+    expect($user->currentTeam)->toBeNull()
+        ->and($user->fallbackTeam())->toBeNull();
+
+    $this->actingAs($user)->get(route('login'))->assertRedirect(route('user.dashboard'));
+    $this->actingAs($user)->get(route('register'))->assertRedirect(route('user.dashboard'));
+    $this->actingAs($user)
+        ->get(route('auth.google.redirect'))
+        ->assertRedirect(route('user.dashboard'));
+});
+
+test('an authenticated user with a team is redirected off guest routes to their team dashboard', function () {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->fresh()->currentTeam;
+
+    $this->actingAs($user)
+        ->get(route('login'))
+        ->assertRedirect(route('dashboard', ['current_team' => $team->slug]));
+});
+
+test('an authenticated user whose current team was cleared falls back to a team they still belong to', function () {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->fresh()->currentTeam;
+    $user->forgetCurrentTeam();
+
+    $this->actingAs($user->fresh())
+        ->get(route('login'))
+        ->assertRedirect(route('dashboard', ['current_team' => $team->slug]));
+});

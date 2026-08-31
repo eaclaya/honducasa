@@ -43,7 +43,10 @@ Route::get('/locations/search', LocationSearchController::class)
 Route::get('/places/search', PlaceSearchController::class)
     ->middleware('throttle:60,1')
     ->name('places.search');
-Route::get('/properties/{property:slug}', PropertyShowController::class)->name('properties.show');
+Route::get('/properties/{property:slug}', [PropertyShowController::class, 'show'])->name('properties.show');
+Route::get('/properties/{property:slug}/preview', [PropertyShowController::class, 'preview'])
+    ->middleware(['auth', 'verified'])
+    ->name('properties.preview');
 Route::post('/locale/{locale}', LocaleController::class)->whereIn('locale', ['es', 'en'])->name('locale.update');
 
 Route::middleware(['guest', 'throttle:20,1'])->group(function () {

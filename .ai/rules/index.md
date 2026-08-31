@@ -5,8 +5,9 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Http/Controllers/Admin/** | .ai/rules/admin.md |
-| app/Http/{Responses/**,Controllers/Auth/**} | .ai/rules/auth.md |
+| {app/Http/{Responses/**,Controllers/Auth/**},app/Providers/FortifyServiceProvider.php} | .ai/rules/auth.md |
 | app/Http/Controllers/** | .ai/rules/controllers.md |
+| {app/Services/ListingPhotoCompressor.php,app/Http/Controllers/ListingUploadController.php,app/Jobs/EnhanceListingPhoto.php} | .ai/rules/jobs.md |
 | resources/js/pages/listings/** | .ai/rules/listings.md |
 | {app/Notifications/**,app/Models/User.php,lang/es.json} | .ai/rules/models.md |
 | app/Http/Requests/Admin/*SubscriptionPlan*.php | .ai/rules/requests-admin.md |

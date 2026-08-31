@@ -19,7 +19,22 @@ type Listing = {
     currency: string;
     image: string | null;
 };
-defineProps<{ listings: Listing[] }>();
+type PaginationLink = {
+    url: string | null;
+    label: string;
+    active: boolean;
+};
+type PaginatedListings = {
+    data: Listing[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+    links: PaginationLink[];
+};
+defineProps<{ listings: PaginatedListings }>();
 const page = usePage();
 const locale = computed(() => page.props.locale);
 const tr = (es: string, en: string): string =>
@@ -31,6 +46,10 @@ const money = (item: Listing): string =>
         currency: item.currency,
         maximumFractionDigits: 0,
     }).format(item.priceAmount);
+const paginationLabel = (label: string): string =>
+    label
+        .replace('&laquo; Previous', tr('Anterior', 'Previous'))
+        .replace('Next &raquo;', tr('Siguiente', 'Next'));
 const remove = (item: Listing): void => {
     if (confirm(tr('¿Eliminar esta propiedad?', 'Delete this listing?'))) {
         router.delete(
@@ -73,11 +92,11 @@ const remove = (item: Listing): void => {
             >
         </div>
         <div
-            v-if="listings.length"
+            v-if="listings.data.length"
             class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
         >
             <article
-                v-for="item in listings"
+                v-for="item in listings.data"
                 :key="item.id"
                 class="overflow-hidden rounded-2xl border bg-card"
             >
@@ -131,7 +150,45 @@ const remove = (item: Listing): void => {
             </article>
         </div>
         <div
-            v-else
+            v-if="listings.data.length && listings.last_page > 1"
+            class="flex flex-col items-center gap-4"
+        >
+            <p class="text-sm text-muted-foreground">
+                {{
+                    tr(
+                        `Mostrando ${listings.from}–${listings.to} de ${listings.total}`,
+                        `Showing ${listings.from}–${listings.to} of ${listings.total}`,
+                    )
+                }}
+            </p>
+            <nav
+                class="flex flex-wrap justify-center gap-2"
+                :aria-label="tr('Páginas de propiedades', 'Listing pages')"
+            >
+                <template v-for="link in listings.links" :key="link.label">
+                    <Link
+                        v-if="link.url"
+                        :href="link.url"
+                        preserve-scroll
+                        class="grid min-w-10 place-items-center rounded-xl border px-3 py-2 text-sm font-semibold transition"
+                        :class="
+                            link.active
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'hover:border-primary'
+                        "
+                        :aria-current="link.active ? 'page' : undefined"
+                        >{{ paginationLabel(link.label) }}</Link
+                    >
+                    <span
+                        v-else
+                        class="grid min-w-10 place-items-center rounded-xl border px-3 py-2 text-sm text-muted-foreground"
+                        >{{ paginationLabel(link.label) }}</span
+                    >
+                </template>
+            </nav>
+        </div>
+        <div
+            v-if="!listings.data.length"
             class="grid min-h-80 place-items-center rounded-2xl border border-dashed text-center"
         >
             <div>

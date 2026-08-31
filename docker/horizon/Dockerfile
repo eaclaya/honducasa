@@ -12,6 +12,7 @@ RUN apk add --no-cache \
         libpng \
         libjpeg-turbo \
         freetype \
+        libwebp \
     && apk add --no-cache --virtual .build-deps \
         $PHPIZE_DEPS \
         postgresql-dev \
@@ -20,8 +21,9 @@ RUN apk add --no-cache \
         libpng-dev \
         libjpeg-turbo-dev \
         freetype-dev \
-    && docker-php-ext-configure gd --with-jpeg --with-freetype \
-    && docker-php-ext-install -j"$(nproc)" pdo_pgsql pgsql gd bcmath intl zip pcntl posix \
+        libwebp-dev \
+    && docker-php-ext-configure gd --with-jpeg --with-freetype --with-webp \
+    && docker-php-ext-install -j"$(nproc)" pdo_pgsql pgsql gd bcmath intl zip pcntl posix exif \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && apk del .build-deps

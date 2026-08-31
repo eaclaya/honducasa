@@ -7,12 +7,13 @@ use App\Models\Location;
 use App\Models\Property;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
-use App\Support\HondurasCityCoordinates;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 uses(RefreshDatabase::class);
 
@@ -21,6 +22,51 @@ test('guests cannot manage listings', function () {
 
     $this->get(route('listings.index', $user->currentTeam))
         ->assertRedirect(route('login'));
+});
+
+test('the listings index paginates and only ever renders one page of listings', function () {
+    $user = User::factory()->create();
+    $location = Location::factory()->hondurasCity()->create();
+    Property::factory()->count(20)->create([
+        'created_by' => $user->getKey(),
+        'team_id' => null,
+        'location_id' => $location->getKey(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('personal-listings.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('listings/Index')
+            ->has('listings.data', 18)
+            ->where('listings.total', 20)
+            ->where('listings.current_page', 1)
+            ->where('listings.last_page', 2));
+
+    $this->actingAs($user)
+        ->get(route('personal-listings.index', ['page' => 2]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('listings.data', 2)
+            ->where('listings.current_page', 2));
+});
+
+test('the listings index does not leak listings owned by another user', function () {
+    $user = User::factory()->create();
+    $stranger = User::factory()->create();
+    $location = Location::factory()->hondurasCity()->create();
+    Property::factory()->count(3)->create([
+        'created_by' => $stranger->getKey(),
+        'team_id' => null,
+        'location_id' => $location->getKey(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('personal-listings.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('listings.data', 0)
+            ->where('listings.total', 0));
 });
 
 test('publishing from the solo wizard creates an individual listing without a team', function () {
@@ -258,19 +304,102 @@ test('the upload endpoint only stores compressed webp photos', function () {
 
     expect($media->id)->toBe($mediaId)
         ->and($media->mime_type)->toBe('image/webp')
-        ->and($media->size)->toBeLessThanOrEqual(4 * 1024 * 1024);
+        ->and($media->size)->toBeLessThanOrEqual(2 * 1024 * 1024);
 });
 
-test('the upload endpoint rejects webp photos above the transformed dimensions', function () {
+test('the upload endpoint returns its validation messages in spanish', function () {
+    Storage::fake('public');
     $user = User::factory()->create();
 
     $this->actingAs($user)
         ->post(route('listings.uploads.store'), [
-            'file' => compressedListingPhoto(width: 2561),
+            'file' => UploadedFile::fake()->image('photo.jpg', 1200, 800),
         ])
-        ->assertSessionHasErrors('file');
+        ->assertSessionHasErrors(['file' => 'Las fotos deben estar en formato WebP.']);
 
-    expect($user->getMedia('pending-listing-photos'))->toHaveCount(0);
+    $this->actingAs($user)
+        ->post(route('listings.uploads.store'), [
+            'file' => UploadedFile::fake()->create('huge.webp', 20481, 'image/webp'),
+        ])
+        ->assertSessionHasErrors(['file' => 'La foto es demasiado grande — debe pesar como máximo 20 MB.']);
+});
+
+test('the upload endpoint accepts any resolution, compressing oversized photos under 2MB instead of rejecting them', function () {
+    Storage::fake('public');
+    $user = User::factory()->create();
+    $noisyPath = noisyImagePath(width: 3000, height: 2000, cellSize: 6);
+    expect(filesize($noisyPath))->toBeGreaterThan(2 * 1024 * 1024);
+
+    $mediaId = (int) $this->actingAs($user)
+        ->post(route('listings.uploads.store'), [
+            'file' => UploadedFile::fake()->createWithContent('large.webp', file_get_contents($noisyPath)),
+        ])
+        ->assertCreated()
+        ->getContent();
+
+    unlink($noisyPath);
+
+    $media = $user->fresh()->getMedia('pending-listing-photos')->sole();
+
+    expect($media->id)->toBe($mediaId)
+        ->and($media->mime_type)->toBe('image/webp')
+        ->and($media->size)->toBeLessThanOrEqual(2 * 1024 * 1024);
+
+    [$width, $height] = getimagesize($media->getPath());
+    expect($width)->toBe(3000)->and($height)->toBe(2000);
+});
+
+test('saving an accepted enhancement drops the original photo it replaced', function () {
+    Storage::fake('public');
+    $user = User::factory()->create();
+    $location = Location::factory()->hondurasCity()->create();
+    $listing = Property::factory()->create([
+        'created_by' => $user->getKey(),
+        'team_id' => null,
+        'location_id' => $location->getKey(),
+    ]);
+    $original = $listing->addMedia(compressedListingPhoto('original.webp'))->toMediaCollection('photos');
+    $enhanced = $user->addMedia(compressedListingPhoto('enhanced.webp'))
+        ->withCustomProperties(['ai_enhanced' => true, 'source_media_id' => $original->getKey()])
+        ->toMediaCollection('pending-listing-photos');
+
+    // A client that submitted both — the exact case that rendered the same
+    // room twice in the uploader.
+    $this->actingAs($user)->put(
+        route('personal-listings.update', $listing),
+        listingPayload($location, ['images' => [$original->getKey(), $enhanced->getKey()]]),
+    )->assertSessionHasNoErrors();
+
+    $photos = $listing->fresh()->getMedia('photos');
+
+    expect($photos)->toHaveCount(1)
+        ->and($photos->first()->getCustomProperty('ai_enhanced'))->toBeTrue()
+        ->and($photos->first()->getCustomProperty('source_media_id'))->toBe($original->getKey())
+        ->and(Media::query()->whereKey($original->getKey())->exists())->toBeFalse()
+        ->and(Media::query()->whereKey($enhanced->getKey())->exists())->toBeFalse();
+});
+
+test('an original kept without its enhancement is left alone', function () {
+    Storage::fake('public');
+    $user = User::factory()->create();
+    $location = Location::factory()->hondurasCity()->create();
+    $listing = Property::factory()->create([
+        'created_by' => $user->getKey(),
+        'team_id' => null,
+        'location_id' => $location->getKey(),
+    ]);
+    $original = $listing->addMedia(compressedListingPhoto('original.webp'))->toMediaCollection('photos');
+    $user->addMedia(compressedListingPhoto('enhanced.webp'))
+        ->withCustomProperties(['ai_enhanced' => true, 'source_media_id' => $original->getKey()])
+        ->toMediaCollection('pending-listing-photos');
+
+    // The enhancement was generated but discarded, so nothing supersedes it.
+    $this->actingAs($user)->put(
+        route('personal-listings.update', $listing),
+        listingPayload($location, ['images' => [$original->getKey()]]),
+    )->assertSessionHasNoErrors();
+
+    expect($listing->fresh()->getMedia('photos')->pluck('id')->all())->toBe([$original->getKey()]);
 });
 
 test('openai moderation rejects a flagged listing text field', function () {
@@ -616,42 +745,3 @@ test('an approximate radius only accepts 100 meter steps from 100 meters to 500 
         ]))
         ->assertSessionHasErrors('approximate_radius_km');
 })->with([0.05, 0.15, 0.6, 25]);
-
-/**
- * A submission pinned at the given city's center. The city itself is never
- * submitted — `SaveListingRequest` derives it from the pin — so pinning there is
- * what files the listing under `$location`.
- *
- * @param  array<string, mixed>  $overrides
- * @return array<string, mixed>
- */
-function listingPayload(Location $location, array $overrides = []): array
-{
-    $center = HondurasCityCoordinates::for($location->name);
-
-    return array_replace([
-        'name' => 'Casa moderna en Tegucigalpa',
-        'type' => 'house',
-        'listing_type' => 'rent',
-        'status' => 'draft',
-        'price_amount' => 22_000,
-        'currency' => 'HNL',
-        'deposit_amount' => 22_000,
-        'utilities_included' => false,
-        'bedrooms' => 3,
-        'bathrooms' => 2,
-        'parking_spaces' => 2,
-        'interior_area_m2' => 180,
-        'lot_area_m2' => 300,
-        'year_built' => 2022,
-        'furnishing' => 'unfurnished',
-        'description' => 'Casa amplia y segura, cerca de comercios, escuelas y las principales vías de la ciudad.',
-        'address_line' => 'Colonia Palmira, Tegucigalpa',
-        'location_mode' => 'exact',
-        'latitude' => $center?->latitude,
-        'longitude' => $center?->longitude,
-        'approximate_shape' => null,
-        'approximate_radius_km' => null,
-        'approximate_polygon' => null,
-    ], $overrides);
-}

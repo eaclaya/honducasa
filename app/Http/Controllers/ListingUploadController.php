@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Actions\Moderation\RecordModerationStrike;
 use App\Exceptions\ContentModerationUnavailableException;
+use App\Services\ListingPhotoCompressor;
 use App\Services\OpenAiContentModerator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -23,6 +25,7 @@ class ListingUploadController extends Controller
     public function __construct(
         private OpenAiContentModerator $contentModerator,
         private RecordModerationStrike $recordModerationStrike,
+        private ListingPhotoCompressor $photoCompressor,
     ) {}
 
     public function store(Request $request): Response
@@ -33,9 +36,12 @@ class ListingUploadController extends Controller
                 'image',
                 'mimes:webp',
                 'mimetypes:image/webp',
-                'max:4096',
-                'dimensions:max_width=2560,max_height=2560',
+                'max:20480',
             ],
+        ], [
+            'file.max' => __('The photo is too large — it must be at most 20 MB.'),
+            'file.mimes' => __('Photos must be in WebP format.'),
+            'file.mimetypes' => __('Photos must be in WebP format.'),
         ]);
 
         $file = $request->file('file');
@@ -59,7 +65,17 @@ class ListingUploadController extends Controller
             ]);
         }
 
-        $media = $request->user()->addMedia($file)->toMediaCollection('pending-listing-photos');
+        // Resolution is never a rejection reason — the photo is compressed
+        // (and, as a last resort, downscaled) to fit a 2MB ceiling instead.
+        $compressedPath = $this->photoCompressor->compress($file->getRealPath());
+
+        try {
+            $media = $request->user()->addMedia($compressedPath)
+                ->usingFileName(Str::random(40).'.webp')
+                ->toMediaCollection('pending-listing-photos');
+        } finally {
+            @unlink($compressedPath);
+        }
 
         return response((string) $media->id, 201);
     }

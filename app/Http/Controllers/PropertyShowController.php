@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\ListingStatus;
 use App\Models\Property;
 use App\Support\CurrencyConverter;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -15,20 +16,51 @@ class PropertyShowController extends Controller
     /**
      * Display a public property listing.
      */
-    public function __invoke(Property $property): Response
+    public function show(Property $property): Response
     {
-        $displayCurrency = $this->currencyConverter->baseCurrency();
-        $property->load([
-            'creator:id,name',
-            'media',
-            'location:id,name',
-            'team:id,name,slug,is_personal,suspended_at',
-        ]);
+        $property->load($this->relations());
         abort_unless(
             $property->status === ListingStatus::Published
                 && ($property->team === null || ! $property->team->isSuspended()),
             404,
         );
+
+        return $this->render($property, isPreview: false);
+    }
+
+    /**
+     * The same page, rendered for someone who can edit the listing so they can
+     * see how it reads before publishing it — or while it sits in any state
+     * that keeps it off the public site.
+     *
+     * A suspended team is not excluded here the way it is in `show()`: this is
+     * owner-only and never surfaces the listing publicly, so it counts as the
+     * team's own console.
+     */
+    public function preview(Property $property): Response
+    {
+        Gate::authorize('update', $property);
+        $property->load($this->relations());
+
+        return $this->render($property, isPreview: true);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function relations(): array
+    {
+        return [
+            'creator:id,name',
+            'media',
+            'location:id,name',
+            'team:id,name,slug,is_personal,suspended_at',
+        ];
+    }
+
+    private function render(Property $property, bool $isPreview): Response
+    {
+        $displayCurrency = $this->currencyConverter->baseCurrency();
         $propertyNormalizedPrice = $property->normalized_price_amount
             ?? $this->currencyConverter->toBase($property->price_amount, $property->currency);
 
@@ -121,6 +153,8 @@ class PropertyShowController extends Controller
                 ],
             ],
             'related' => $related,
+            'isPreview' => $isPreview,
+            'status' => $property->status->value,
         ]);
     }
 }

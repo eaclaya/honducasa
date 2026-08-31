@@ -1,6 +1,7 @@
 <?php
 
 use App\Data\GeoPoint;
+use App\Enums\ListingStatus;
 use App\Enums\ListingType;
 use App\Enums\LocationPrecision;
 use App\Enums\PropertyType;
@@ -174,4 +175,84 @@ test('a suspended team\'s properties are excluded from the related listings side
 
     $this->get(route('properties.show', $property))
         ->assertInertia(fn (Assert $page) => $page->has('related', 0));
+});
+
+test('a listing owner can preview a draft that the public page still hides', function () {
+    $owner = User::factory()->create();
+    $property = Property::factory()->create([
+        'team_id' => null,
+        'created_by' => $owner->getKey(),
+        'name' => 'Casa sin publicar',
+        'status' => ListingStatus::Draft,
+    ]);
+
+    $this->get(route('properties.show', $property))->assertNotFound();
+
+    $this->actingAs($owner)
+        ->get(route('properties.preview', $property))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('properties/Show')
+            ->where('property.name', 'Casa sin publicar')
+            ->where('isPreview', true)
+            ->where('status', 'draft'));
+});
+
+test('preview renders a published listing too, flagged as a preview', function () {
+    $owner = User::factory()->create();
+    $property = Property::factory()->create([
+        'team_id' => null,
+        'created_by' => $owner->getKey(),
+        'status' => ListingStatus::Published,
+    ]);
+
+    $this->actingAs($owner)
+        ->get(route('properties.preview', $property))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('isPreview', true)->where('status', 'published'));
+
+    $this->get(route('properties.show', $property))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('isPreview', false));
+});
+
+test('preview is refused to anyone who cannot edit the listing', function () {
+    $owner = User::factory()->create();
+    $stranger = User::factory()->create();
+    $property = Property::factory()->create([
+        'team_id' => null,
+        'created_by' => $owner->getKey(),
+        'status' => ListingStatus::Draft,
+    ]);
+
+    $this->actingAs($stranger)
+        ->get(route('properties.preview', $property))
+        ->assertForbidden();
+});
+
+test('preview sends a guest to log in rather than rendering the listing', function () {
+    $property = Property::factory()->create([
+        'team_id' => null,
+        'status' => ListingStatus::Draft,
+    ]);
+
+    $this->get(route('properties.preview', $property))
+        ->assertRedirect(route('login'));
+});
+
+test('the edit form receives the slug and status its preview button needs', function () {
+    $owner = User::factory()->create();
+    $property = Property::factory()->create([
+        'team_id' => null,
+        'created_by' => $owner->getKey(),
+        'status' => ListingStatus::Draft,
+    ]);
+
+    $this->actingAs($owner)
+        ->get(route('personal-listings.edit', $property))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('listings/Form')
+            ->where('listing.slug', $property->slug)
+            ->where('listing.status', 'draft'));
 });

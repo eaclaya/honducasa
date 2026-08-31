@@ -15,24 +15,20 @@
     "Search saved.": "Búsqueda guardada.",
     "Search updated.": "Búsqueda actualizada.",
     "This search is already saved.": "Esta búsqueda ya está guardada.",
-
     "Hello!": "¡Hola!",
     "Whoops!": "¡Ups!",
     "Regards,": "Saludos,",
     "All rights reserved.": "Todos los derechos reservados.",
     "If you're having trouble clicking the \":actionText\" button, copy and paste the URL below\ninto your web browser:": "Si tienes problemas para hacer clic en el botón \":actionText\", copia y pega la siguiente URL\nen tu navegador web:",
-
     "Verify your email address": "Verifica tu correo electrónico",
     "Please click the button below to verify your email address.": "Haz clic en el botón de abajo para verificar tu correo electrónico.",
     "Verify Email Address": "Verificar correo electrónico",
     "If you did not create an account, no further action is required.": "Si no creaste una cuenta, no se requiere ninguna acción adicional.",
-
     "Reset your password": "Restablece tu contraseña",
     "You are receiving this email because we received a password reset request for your account.": "Recibes este correo porque recibimos una solicitud para restablecer la contraseña de tu cuenta.",
     "Reset Password": "Restablecer contraseña",
     "This password reset link will expire in :count minutes.": "Este enlace para restablecer la contraseña expirará en :count minutos.",
     "If you did not request a password reset, no further action is required.": "Si no solicitaste un restablecimiento de contraseña, no se requiere ninguna acción adicional.",
-
     "You've been invited to join :teamName": "Has sido invitado a unirte a :teamName",
     ":inviterName has invited you to join the :teamName team.": ":inviterName te ha invitado a unirte al equipo :teamName.",
     "Log in and visit your dashboard to accept or decline this invitation.": "Inicia sesión y visita tu panel para aceptar o rechazar esta invitación.",
@@ -52,5 +48,8 @@
     "One of the selected photos is invalid.": "Una de las fotos seleccionadas no es válida.",
     "The account was removed from the blacklist.": "La cuenta fue eliminada de la lista negra.",
     "This account has been suspended.": "Esta cuenta ha sido suspendida.",
+    "The photo is too large — it must be at most 20 MB.": "La foto es demasiado grande — debe pesar como máximo 20 MB.",
+    "Photos must be in WebP format.": "Las fotos deben estar en formato WebP.",
+    "This listing has already used all :limit AI photo enhancements.": "Esta propiedad ya usó las :limit mejoras de fotos con IA disponibles.",
     "email": "correo electrónico"
 }
