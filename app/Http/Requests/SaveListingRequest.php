@@ -172,7 +172,10 @@ class SaveListingRequest extends FormRequest
                 }
             },
             function (Validator $validator): void {
-                if ($validator->errors()->isNotEmpty()) {
+                // Skipped for precognitive (live "on change") validation —
+                // moderation calls OpenAI, so it only runs on the real save
+                // rather than once per keystroke/field blur.
+                if ($validator->errors()->isNotEmpty() || $this->isPrecognitive()) {
                     return;
                 }
 
@@ -193,7 +196,7 @@ class SaveListingRequest extends FormRequest
 
                 $flaggedFields = $moderation['flagged_fields'];
 
-                if ($flaggedFields !== [] && ! $this->isPrecognitive()) {
+                if ($flaggedFields !== []) {
                     app(RecordModerationStrike::class)->handle(
                         $this->user(),
                         'listing_text',

@@ -11,4 +11,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Notifications/**,app/Models/User.php,lang/es.json} | .ai/rules/models.md |
 | app/Http/Requests/Admin/*SubscriptionPlan*.php | .ai/rules/requests-admin.md |
 | app/Http/Requests/SaveListingRequest.php | .ai/rules/requests.md |
+| {tests/**,phpunit.xml,app/Services/OpenAiContentModerator.php} | .ai/rules/services.md |
 | app/{Actions/Teams/SubscribeToPlan.php,Http/Controllers/Teams/TeamBillingController.php} | .ai/rules/teams.md |

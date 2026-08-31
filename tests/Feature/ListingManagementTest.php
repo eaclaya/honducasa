@@ -341,20 +341,12 @@ test('spanish profanity rejects a listing title before openai safety moderation'
     Http::assertSent(fn ($request): bool => $request['input'][0]['text'] === 'Casa en pelame la verga');
 });
 
-test('precognitive profanity validation does not record a moderation strike', function () {
+test('precognitive validation skips content moderation entirely, saving the API call', function () {
     config()->set([
         'services.openai.api_key' => 'test-key',
         'services.openai.moderation_enabled' => true,
     ]);
-    Http::fake([
-        'api.openai.com/v1/moderations' => Http::response([
-            'results' => [
-                ['flagged' => false],
-                ['flagged' => false],
-                ['flagged' => false],
-            ],
-        ]),
-    ]);
+    Http::fake();
 
     $user = User::factory()->withPersonalTeam()->create();
     $location = Location::factory()->hondurasCity()->create();
@@ -368,10 +360,10 @@ test('precognitive profanity validation does not record a moderation strike', fu
         ->post(route('listings.store', $user->currentTeam), listingPayload($location, [
             'name' => 'Casa en pelame la verga',
         ]))
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors('name');
+        ->assertNoContent();
 
     expect($user->moderationStrikes()->count())->toBe(0);
+    Http::assertNothingSent();
 });
 
 test('openai moderation rejects a flagged photo before it is stored', function () {
