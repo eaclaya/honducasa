@@ -58,6 +58,35 @@ test('contact details and external links are rejected from chat messages', funct
     'link' => 'Mira mi información en https://example.com/contacto para coordinar.',
 ]);
 
+test('profanity is rejected from the first message that starts a conversation', function () {
+    $property = Property::factory()->create();
+    $renter = User::factory()->create();
+
+    $this->actingAs($renter)
+        ->from(route('properties.show', $property))
+        ->post(route('conversations.store', $property), ['body' => 'Esta propiedad de mierda no vale lo que piden, pelame la verga.'])
+        ->assertRedirect(route('properties.show', $property))
+        ->assertSessionHasErrors('body');
+
+    expect(Message::query()->count())->toBe(0);
+});
+
+test('profanity is rejected from a reply inside an existing conversation', function () {
+    $property = Property::factory()->create();
+    $renter = User::factory()->create();
+    $conversation = Conversation::factory()->create([
+        'property_id' => $property->id,
+        'team_id' => $property->team_id,
+        'renter_id' => $renter->id,
+    ]);
+
+    $this->actingAs($renter)
+        ->post(route('messages.store', $conversation), ['body' => 'pelame la verga'])
+        ->assertSessionHasErrors('body');
+
+    expect($conversation->messages()->count())->toBe(0);
+});
+
 test('the renter and property team can view and reply but outsiders cannot', function () {
     $property = Property::factory()->create();
     $renter = User::factory()->create();

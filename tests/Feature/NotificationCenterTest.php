@@ -5,6 +5,7 @@ use App\Models\Property;
 use App\Models\User;
 use App\Notifications\ConversationMessageReceived;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -25,11 +26,26 @@ test('new messages create privacy-safe database notifications for the other part
         'body' => 'Quisiera confirmar si la propiedad continúa disponible esta semana.',
     ])->assertRedirect();
 
-    Notification::assertSentTo($teamMember, ConversationMessageReceived::class, function ($notification) use ($conversation) {
+    Notification::assertSentTo($teamMember, ConversationMessageReceived::class, function ($notification, $channels) use ($conversation) {
         return $notification->conversationId === $conversation->id
             && $notification->senderLabel === 'Persona interesada'
-            && ! str_contains($notification->preview, '@');
+            && ! str_contains($notification->preview, '@')
+            && in_array('mail', $channels, true);
     });
+});
+
+test('a new message notification emails the recipient with a link to the conversation', function () {
+    $user = User::factory()->create();
+    $notification = new ConversationMessageReceived(10, 'Casa Centro', 'Equipo Centro', 'Hay una nueva respuesta.');
+
+    expect($notification->via($user))->toContain('mail');
+
+    $mail = $notification->toMail($user);
+
+    expect($mail)->toBeInstanceOf(MailMessage::class)
+        ->and($mail->subject)->toBe('Nuevo mensaje sobre Casa Centro')
+        ->and($mail->actionUrl)->toBe(route('messages.show', 10))
+        ->and(implode(' ', $mail->introLines))->toContain('Hay una nueva respuesta.');
 });
 
 test('users can view and mark their own notifications as read', function () {

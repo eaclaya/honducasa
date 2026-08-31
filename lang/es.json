@@ -51,5 +51,8 @@
     "The photo is too large — it must be at most 20 MB.": "La foto es demasiado grande — debe pesar como máximo 20 MB.",
     "Photos must be in WebP format.": "Las fotos deben estar en formato WebP.",
     "This listing has already used all :limit AI photo enhancements.": "Esta propiedad ya usó las :limit mejoras de fotos con IA disponibles.",
+    "New message about :propertyName": "Nuevo mensaje sobre :propertyName",
+    ":senderLabel sent you a message about :propertyName.": ":senderLabel te envió un mensaje sobre :propertyName.",
+    "View conversation": "Ver conversación",
     "email": "correo electrónico"
 }

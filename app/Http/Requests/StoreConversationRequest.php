@@ -7,6 +7,7 @@ use App\Enums\ListingStatus;
 use App\Models\Conversation;
 use App\Models\Property;
 use App\Rules\ContainsNoContactInformation;
+use App\Rules\ContainsNoProfanity;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -44,7 +45,7 @@ class StoreConversationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'body' => ['required', 'string', 'min:20', 'max:2000', new ContainsNoContactInformation],
+            'body' => ['required', 'string', 'min:20', 'max:2000', new ContainsNoContactInformation, new ContainsNoProfanity],
         ];
     }
 }

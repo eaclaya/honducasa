@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\ConversationStatus;
 use App\Models\Conversation;
 use App\Rules\ContainsNoContactInformation;
+use App\Rules\ContainsNoProfanity;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -30,7 +31,7 @@ class StoreMessageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'body' => ['required', 'string', 'min:2', 'max:2000', new ContainsNoContactInformation],
+            'body' => ['required', 'string', 'min:2', 'max:2000', new ContainsNoContactInformation, new ContainsNoProfanity],
         ];
     }
 }
