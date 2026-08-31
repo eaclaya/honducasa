@@ -58,7 +58,9 @@ const dashboardUrl = computed(() =>
         : userDashboard().url,
 );
 
-const hasTeams = computed(() => page.props.teams.length > 0);
+const hasAgencies = computed(() =>
+    page.props.teams.some((team) => !team.isPersonal),
+);
 
 const activeItemStyles =
     'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
@@ -276,7 +278,7 @@ const rightNavItems: NavItem[] = [
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <TeamSwitcher v-if="hasTeams" :in-header="true" />
+                    <TeamSwitcher v-if="hasAgencies" :in-header="true" />
                 </div>
             </div>
         </div>

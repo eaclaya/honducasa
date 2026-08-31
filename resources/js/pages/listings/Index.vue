@@ -3,6 +3,11 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { Building2, Edit3, Plus, Trash2 } from '@lucide/vue';
 import { computed } from 'vue';
 import { create, destroy, edit } from '@/routes/listings';
+import {
+    create as createPersonal,
+    destroy as destroyPersonal,
+    edit as editPersonal,
+} from '@/routes/personal-listings';
 
 type Listing = {
     id: number;
@@ -29,7 +34,12 @@ const money = (item: Listing): string =>
 const remove = (item: Listing): void => {
     if (confirm(tr('¿Eliminar esta propiedad?', 'Delete this listing?'))) {
         router.delete(
-            destroy.url({ current_team: team.value.slug, listing: item.id }),
+            team.value
+                ? destroy.url({
+                      current_team: team.value.slug,
+                      listing: item.id,
+                  })
+                : destroyPersonal.url(item.id),
         );
     }
 };
@@ -55,7 +65,7 @@ const remove = (item: Listing): void => {
                 </p>
             </div>
             <Link
-                :href="create.url(team.slug)"
+                :href="team ? create.url(team.slug) : createPersonal().url"
                 class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground"
                 ><Plus class="size-5" />{{
                     tr('Nueva propiedad', 'New listing')
@@ -99,10 +109,12 @@ const remove = (item: Listing): void => {
                     <div class="mt-5 flex gap-2">
                         <Link
                             :href="
-                                edit.url({
-                                    current_team: team.slug,
-                                    listing: item.id,
-                                })
+                                team
+                                    ? edit.url({
+                                          current_team: team.slug,
+                                          listing: item.id,
+                                      })
+                                    : editPersonal.url(item.id)
                             "
                             class="flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold"
                             ><Edit3 class="size-4" />{{

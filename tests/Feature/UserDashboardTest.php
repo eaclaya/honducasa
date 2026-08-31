@@ -29,12 +29,13 @@ test('team-less users see the user dashboard', function () {
     );
 });
 
-test('users with a team are redirected to their team dashboard', function () {
+test('users with an agency can still access their personal dashboard', function () {
     $user = User::factory()->withPersonalTeam()->create();
 
     $this->actingAs($user)
         ->get(route('user.dashboard'))
-        ->assertRedirect(route('dashboard', ['current_team' => $user->currentTeam->slug]));
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('UserDashboard'));
 });
 
 test('the user dashboard lists pending team invitations', function () {
@@ -112,10 +113,11 @@ test('visiting the listing wizard as a team-less user creates no team', function
         ->and($user->fresh()->current_team_id)->toBeNull();
 });
 
-test('visiting the listing wizard as an existing landlord redirects to their team', function () {
+test('visiting the solo listing wizard as an agency member stays individual', function () {
     $user = User::factory()->withPersonalTeam()->create();
 
     $this->actingAs($user)
         ->get(route('listings.start'))
-        ->assertRedirect(route('listings.create', ['current_team' => $user->currentTeam->slug]));
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('listings/Form'));
 });

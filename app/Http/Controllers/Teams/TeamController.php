@@ -27,7 +27,9 @@ class TeamController extends Controller
         $user = $request->user();
 
         return Inertia::render('teams/Index', [
-            'teams' => $user->toUserTeams(includeCurrent: true),
+            'teams' => $user->toUserTeams(includeCurrent: true)
+                ->where('isPersonal', false)
+                ->values(),
         ]);
     }
 
@@ -115,6 +117,13 @@ class TeamController extends Controller
         $request->user()->switchTeam($team);
 
         return back();
+    }
+
+    public function switchToPersonal(Request $request): RedirectResponse
+    {
+        $request->user()->forgetCurrentTeam();
+
+        return to_route('user.dashboard');
     }
 
     /**

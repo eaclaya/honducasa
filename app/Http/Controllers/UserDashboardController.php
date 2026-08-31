@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Enums\ConversationStatus;
 use App\Models\TeamInvitation;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -14,13 +13,9 @@ class UserDashboardController extends Controller
     /**
      * Show the team-less user dashboard, or forward landlords to their team dashboard.
      */
-    public function __invoke(Request $request): Response|RedirectResponse
+    public function __invoke(Request $request): Response
     {
         $user = $request->user();
-
-        if ($user->currentTeam) {
-            return to_route('dashboard', ['current_team' => $user->currentTeam->slug]);
-        }
 
         return Inertia::render('UserDashboard', [
             'pendingInvitations' => $user->pendingTeamInvitations()
@@ -33,6 +28,7 @@ class UserDashboardController extends Controller
                     ],
                 ]),
             'metrics' => [
+                'listings' => $user->createdProperties()->whereNull('team_id')->count(),
                 'favorites' => $user->propertyFavorites()->count(),
                 'savedSearches' => $user->savedSearches()->count(),
                 'activeConversations' => $user->conversations()
@@ -40,7 +36,7 @@ class UserDashboardController extends Controller
                     ->count(),
             ],
             'recentConversations' => $user->conversations()
-                ->with(['property:id,name,slug', 'team:id,name'])
+                ->with(['property:id,name,slug,created_by,team_id', 'property.creator:id,name', 'team:id,name'])
                 ->latest('last_message_at')
                 ->limit(6)
                 ->get()
@@ -48,7 +44,7 @@ class UserDashboardController extends Controller
                     'id' => $conversation->id,
                     'propertyName' => $conversation->property->name,
                     'propertySlug' => $conversation->property->slug,
-                    'teamName' => $conversation->team->name,
+                    'teamName' => $conversation->team?->name ?? $conversation->property->creator->name,
                     'status' => $conversation->status->value,
                     'lastMessageAt' => $conversation->last_message_at?->diffForHumans(),
                 ]),

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { LogOut, Settings } from '@lucide/vue';
+import { Building2, LogOut, Settings } from '@lucide/vue';
 import {
     DropdownMenuGroup,
     DropdownMenuItem,
@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import UserInfo from '@/components/UserInfo.vue';
 import { logout } from '@/routes';
+import { create as createAgency } from '@/routes/agencies';
 import { edit } from '@/routes/profile';
 import type { User } from '@/types';
 
@@ -39,6 +40,12 @@ const tr = (es: string, en: string): string =>
             <Link class="block w-full cursor-pointer" :href="edit()" prefetch>
                 <Settings class="mr-2 h-4 w-4" />
                 {{ tr('Configuración', 'Settings') }}
+            </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem :as-child="true">
+            <Link class="block w-full cursor-pointer" :href="createAgency()">
+                <Building2 class="mr-2 h-4 w-4" />
+                {{ tr('Crear una agencia', 'Create an agency') }}
             </Link>
         </DropdownMenuItem>
     </DropdownMenuGroup>

@@ -21,7 +21,8 @@ class ConversationPolicy
     public function view(User $user, Conversation $conversation): bool
     {
         return $conversation->renter_id === $user->id
-            || $user->teams()->whereKey($conversation->team_id)->exists();
+            || $conversation->property()->where('created_by', $user->id)->whereNull('team_id')->exists()
+            || ($conversation->team_id !== null && $user->teams()->whereKey($conversation->team_id)->exists());
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Auth;
 
+use App\Actions\Notifications\NotifyAdministrators;
 use App\Enums\IdentityProvider;
 use App\Models\OauthIdentity;
 use App\Models\User;
@@ -45,7 +46,7 @@ class ResolveGoogleUser
             throw new DomainException(__('An account already uses this email. Sign in manually before connecting Google.'));
         }
 
-        return DB::transaction(function () use ($googleUser, $subject, $email) {
+        $user = DB::transaction(function () use ($googleUser, $subject, $email) {
             $name = trim((string) $googleUser->getName()) ?: Str::before($email, '@');
 
             $user = User::create([
@@ -66,5 +67,9 @@ class ResolveGoogleUser
 
             return $user;
         });
+
+        app(NotifyAdministrators::class)->ofNewAccount($user, 'google');
+
+        return $user;
     }
 }

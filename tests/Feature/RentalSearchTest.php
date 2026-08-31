@@ -7,13 +7,54 @@ use App\Enums\LocationType;
 use App\Enums\PropertyType;
 use App\Models\Location;
 use App\Models\Property;
+use App\Models\SavedSearch;
 use App\Models\Team;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
+
+test('rental results indicate when the current search is saved', function () {
+    $user = User::factory()->create(['email_verified_at' => now()]);
+    SavedSearch::factory()->for($user)->create([
+        'name' => 'Tegucigalpa rentals',
+        'filters' => ['location' => 'Tegucigalpa', 'listing_type' => 'rent'],
+    ]);
+
+    $this->actingAs($user)->get(route('rentals.index', [
+        'listing_type' => 'rent',
+        'location' => 'Tegucigalpa',
+    ]))->assertInertia(fn (Assert $page) => $page
+        ->where('isSearchSaved', true)
+        ->where('savedSearch.id', SavedSearch::query()->sole()->id)
+        ->where('savedSearch.hasChanges', false));
+
+    auth()->logout();
+
+    $this->get(route('rentals.index', [
+        'listing_type' => 'rent',
+        'location' => 'Tegucigalpa',
+    ]))->assertInertia(fn (Assert $page) => $page->where('isSearchSaved', false));
+});
+
+test('rental results track refinements made from a saved search', function () {
+    $user = User::factory()->create(['email_verified_at' => now()]);
+    $savedSearch = SavedSearch::factory()->for($user)->create();
+
+    $this->actingAs($user)->get(route('rentals.index', [
+        ...$savedSearch->filters,
+        'saved_search' => $savedSearch->id,
+        'bedrooms' => 3,
+        'property_type' => 'house',
+    ]))->assertInertia(fn (Assert $page) => $page
+        ->where('isSearchSaved', false)
+        ->where('savedSearch.id', $savedSearch->id)
+        ->where('savedSearch.name', $savedSearch->name)
+        ->where('savedSearch.hasChanges', true));
+});
 
 test('rentals can be searched by Honduran city', function () {
     Storage::fake('public');
@@ -36,6 +77,9 @@ test('rentals can be searched by Honduran city', function () {
     $media = $capitalApartment
         ->addMedia(UploadedFile::fake()->image('capital-apartment.jpg'))
         ->toMediaCollection('photos');
+    $secondMedia = $capitalApartment
+        ->addMedia(UploadedFile::fake()->image('capital-apartment-patio.jpg'))
+        ->toMediaCollection('photos');
     Property::factory()->for($sanPedroSula)->create(['name' => 'Valley House']);
 
     $this->get(route('rentals.index', ['location' => 'tegucigalpa']))
@@ -48,7 +92,9 @@ test('rentals can be searched by Honduran city', function () {
             ->where('properties.data.0.location', 'Tegucigalpa')
             ->where('properties.data.0.priceAmount', 15_000)
             ->where('properties.data.0.currency', 'HNL')
-            ->where('properties.data.0.primaryImage.url', $media->getUrl('thumb')));
+            ->where('properties.data.0.primaryImage.url', $media->getUrl('thumb'))
+            ->where('properties.data.0.images.0.url', $media->getUrl('thumb'))
+            ->where('properties.data.0.images.1.url', $secondMedia->getUrl('thumb')));
 });
 
 test('location searches do not require accent marks', function () {
@@ -153,6 +199,53 @@ test('rentals can be filtered by price features and furnishing', function () {
         ->where('filters.utilitiesIncluded', true));
 });
 
+test('price filters compare listings across currencies using the normalized price', function () {
+    $location = Location::factory()->create(['name' => 'Tegucigalpa']);
+
+    Property::factory()->for($location)->create([
+        'name' => 'USD apartment',
+        'currency' => 'USD',
+        'price_amount' => 1_000,
+    ]);
+    Property::factory()->for($location)->create([
+        'name' => 'Below range HNL apartment',
+        'currency' => 'HNL',
+        'price_amount' => 23_000,
+    ]);
+
+    $this->get(route('rentals.index', [
+        'location' => 'Tegucigalpa',
+        'min_price' => 24_000,
+    ]))->assertInertia(fn (Assert $page) => $page
+        ->has('properties.data', 1)
+        ->where('properties.data.0.name', 'USD apartment')
+        ->where('properties.data.0.priceAmount', 24_700)
+        ->where('properties.data.0.currency', 'HNL')
+        ->where('properties.data.0.originalPriceAmount', 1_000)
+        ->where('properties.data.0.originalCurrency', 'USD')
+        ->where('properties.data.0.priceIsConverted', true));
+});
+
+test('price sorting compares the normalized value instead of raw currency amounts', function () {
+    $location = Location::factory()->create(['name' => 'Tegucigalpa']);
+
+    Property::factory()->for($location)->create([
+        'name' => 'USD apartment',
+        'currency' => 'USD',
+        'price_amount' => 1_000,
+    ]);
+    Property::factory()->for($location)->create([
+        'name' => 'HNL apartment',
+        'currency' => 'HNL',
+        'price_amount' => 24_000,
+    ]);
+
+    $this->get(route('rentals.index', ['sort' => 'price_asc']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('properties.data.0.name', 'HNL apartment')
+            ->where('properties.data.1.name', 'USD apartment'));
+});
+
 test('rentals can be sorted by price', function () {
     $location = Location::factory()->create(['name' => 'Tegucigalpa']);
 
@@ -193,10 +286,22 @@ test('rentals can be filtered to the visible map bounds', function () {
         ->where('filters.north', 14.20));
 });
 
-test('exact listing map coordinates are rounded for public privacy', function () {
+test('exact listing map coordinates preserve their full precision', function () {
     $location = Location::factory()->create(['name' => 'Tegucigalpa']);
     Property::factory()->for($location)->at(new GeoPoint(14.076543, -87.192345))->create([
         'public_location_precision' => LocationPrecision::Exact,
+    ]);
+
+    $this->get(route('rentals.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('properties.data.0.mapLatitude', 14.076543)
+            ->where('properties.data.0.mapLongitude', -87.192345));
+});
+
+test('approximate listing map coordinates remain rounded for public privacy', function () {
+    $location = Location::factory()->create(['name' => 'Tegucigalpa']);
+    Property::factory()->for($location)->at(new GeoPoint(14.076543, -87.192345))->create([
+        'public_location_precision' => LocationPrecision::Approximate,
     ]);
 
     $this->get(route('rentals.index'))

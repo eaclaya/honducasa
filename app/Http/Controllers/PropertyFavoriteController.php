@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\ListingStatus;
+use App\Actions\Properties\FavoriteProperty;
 use App\Models\Property;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,10 +30,9 @@ class PropertyFavoriteController extends Controller
         return Inertia::render('favorites/Index', ['favorites' => $favorites]);
     }
 
-    public function store(Request $request, Property $property): RedirectResponse
+    public function store(Request $request, Property $property, FavoriteProperty $favoriteProperty): RedirectResponse
     {
-        abort_unless($property->status === ListingStatus::Published && ! $property->team->isSuspended(), 404);
-        $request->user()->propertyFavorites()->firstOrCreate(['property_id' => $property->id]);
+        $favoriteProperty->handle($request->user(), $property);
 
         return back();
     }

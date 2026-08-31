@@ -11,14 +11,15 @@ class NotifyConversationParticipants
 {
     public function handle(Conversation $conversation, Message $message): void
     {
-        $conversation->loadMissing(['property:id,name', 'team:id,name', 'team.members:id', 'renter:id']);
+        $conversation->loadMissing(['property:id,name,created_by,team_id', 'property.creator:id,name', 'team:id,name', 'team.members:id', 'renter:id']);
 
         if ($message->sender_id === $conversation->renter_id) {
-            $recipients = $conversation->team->members->where('id', '!=', $message->sender_id);
+            $recipients = $conversation->team?->members->where('id', '!=', $message->sender_id)
+                ?? collect([$conversation->property->creator])->where('id', '!=', $message->sender_id);
             $senderLabel = app()->getLocale() === 'es' ? 'Persona interesada' : 'Prospective renter';
         } else {
             $recipients = collect([$conversation->renter])->where('id', '!=', $message->sender_id);
-            $senderLabel = $conversation->team->name;
+            $senderLabel = $conversation->team?->name ?? $conversation->property->creator->name;
         }
 
         foreach ($recipients as $recipient) {

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { index as favorites } from '@/routes/favorites';
 import { start as startListing } from '@/routes/listings';
 import { show as messages } from '@/routes/messages';
+import { index as personalListings } from '@/routes/personal-listings';
 import { index as rentals } from '@/routes/rentals';
 import { index as savedSearches } from '@/routes/saved-searches';
 import type { DashboardInvitation } from '@/types';
@@ -20,6 +21,7 @@ type RecentConversation = {
 };
 
 type Metrics = {
+    listings: number;
     favorites: number;
     savedSearches: number;
     activeConversations: number;
@@ -68,9 +70,51 @@ defineOptions({
             </p>
         </div>
 
-        <section class="grid gap-4 sm:grid-cols-3">
+        <section
+            class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-card p-6 shadow-sm"
+        >
+            <div class="min-w-0">
+                <h2 class="flex items-center gap-2 text-xl font-semibold">
+                    <Building2 class="size-5 text-blue-700" />
+                    {{
+                        tr(
+                            '¿Quieres publicar una propiedad?',
+                            'Want to list a property?',
+                        )
+                    }}
+                </h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                    {{
+                        tr(
+                            'Publica tu propiedad y empieza a recibir mensajes de interesados.',
+                            'Publish your property and start receiving messages from interested renters.',
+                        )
+                    }}
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <Button variant="outline" as-child>
+                    <Link :href="rentals().url">{{
+                        tr('Explorar propiedades', 'Explore properties')
+                    }}</Link>
+                </Button>
+                <Button data-test="become-landlord-button" as-child>
+                    <Link :href="startListing().url">{{
+                        tr('Publicar propiedad', 'List a property')
+                    }}</Link>
+                </Button>
+            </div>
+        </section>
+
+        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Link
                 v-for="item in [
+                    {
+                        label: tr('Propiedades', 'Listings'),
+                        value: metrics.listings,
+                        icon: Building2,
+                        href: personalListings().url,
+                    },
                     {
                         label: tr('Favoritos', 'Favorites'),
                         value: metrics.favorites,
@@ -145,42 +189,6 @@ defineOptions({
                     )
                 }}
             </p>
-        </section>
-
-        <section
-            class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-card p-6 shadow-sm"
-        >
-            <div class="min-w-0">
-                <h2 class="flex items-center gap-2 text-xl font-semibold">
-                    <Building2 class="size-5 text-blue-700" />
-                    {{
-                        tr(
-                            '¿Quieres publicar una propiedad?',
-                            'Want to list a property?',
-                        )
-                    }}
-                </h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                    {{
-                        tr(
-                            'Publica tu propiedad y empieza a recibir mensajes de interesados.',
-                            'Publish your property and start receiving messages from interested renters.',
-                        )
-                    }}
-                </p>
-            </div>
-            <div class="flex gap-3">
-                <Button variant="outline" as-child>
-                    <Link :href="rentals().url">{{
-                        tr('Explorar propiedades', 'Explore properties')
-                    }}</Link>
-                </Button>
-                <Button data-test="become-landlord-button" as-child>
-                    <Link :href="startListing().url">{{
-                        tr('Publicar propiedad', 'List a property')
-                    }}</Link>
-                </Button>
-            </div>
         </section>
     </main>
 </template>

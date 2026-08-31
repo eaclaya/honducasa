@@ -152,8 +152,8 @@ const setMarker = (coordinates: Coordinate): void => {
 const showRadius = (coordinates: Coordinate): void => {
     removeLocationLayers();
     approximateArea = createCircle([coordinates[1], coordinates[0]], {
-        color: '#1d4ed8',
-        fillColor: '#2563eb',
+        color: '#1D4ED8',
+        fillColor: '#2563EB',
         fillOpacity: 0.2,
         radius: approximateRadiusMeters.value,
         weight: 2,
@@ -364,8 +364,8 @@ onBeforeUnmount(() => {
             <span>
                 {{
                     $page.props.locale === 'es'
-                        ? 'Nunca mostramos tu dirección exacta a otros usuarios. En el mapa público solo verán una zona aproximada, incluso si eliges "Ubicación exacta".'
-                        : 'We never show your exact address to other users. On the public map they will only see an approximate area, even if you choose "Exact location".'
+                        ? 'La ubicación exacta muestra el pin donde lo colocas. Elige "Región aproximada" si prefieres ocultar el punto exacto.'
+                        : 'Exact location shows the pin where you place it. Choose "Approximate region" if you prefer to hide the exact point.'
                 }}
             </span>
         </div>
@@ -445,7 +445,7 @@ onBeforeUnmount(() => {
                     class="rounded-md px-1 py-1.5 text-xs font-medium transition"
                     :class="
                         approximateRadiusMeters === meters
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-primary text-primary-foreground'
                             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     "
                     @click="approximateRadiusMeters = meters"

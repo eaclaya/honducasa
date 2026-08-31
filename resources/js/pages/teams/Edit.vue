@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Form, Head, router, usePage } from '@inertiajs/vue3';
+import { Form, Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ChevronDown, Mail, UserPlus, X } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import CancelInvitationModal from '@/components/CancelInvitationModal.vue';
@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useInitials } from '@/composables/useInitials';
 import { edit, index, update } from '@/routes/teams';
+import { edit as editBilling } from '@/routes/teams/billing';
 import { update as updateMember } from '@/routes/teams/members';
 import type {
     RoleOption,
@@ -150,6 +151,25 @@ const confirmCancelInvitation = (invitation: TeamInvitation) => {
 
         <div v-else class="space-y-6">
             <Heading variant="small" :title="team.name" />
+        </div>
+
+        <!-- Billing Section -->
+        <div v-if="permissions.canUpdateTeam" class="space-y-6">
+            <Heading
+                variant="small"
+                :title="tr('Plan y facturación', 'Plan & billing')"
+                :description="
+                    tr(
+                        'Administra el plan de suscripción de tu equipo',
+                        'Manage your team’s subscription plan',
+                    )
+                "
+            />
+            <Button variant="outline" as-child>
+                <Link :href="editBilling(team.slug)">{{
+                    tr('Ver planes', 'View plans')
+                }}</Link>
+            </Button>
         </div>
 
         <!-- Members Section -->

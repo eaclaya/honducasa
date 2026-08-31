@@ -7,9 +7,11 @@ import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { toUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
+import { edit as editPersonalBilling } from '@/routes/billing';
 import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import { index as teams } from '@/routes/teams';
+import { edit as editBilling } from '@/routes/teams/billing';
 import type { NavItem } from '@/types';
 
 const page = usePage();
@@ -25,11 +27,19 @@ const sidebarNavItems = computed<NavItem[]>(() => [
         title: tr('Seguridad', 'Security'),
         href: editSecurity(),
     },
-    ...(page.props.teams.length > 0
+    {
+        title: tr('Agencias', 'Agencies'),
+        href: teams(),
+    },
+    {
+        title: tr('Plan personal', 'Personal plan'),
+        href: editPersonalBilling(),
+    },
+    ...(page.props.currentTeam && page.props.currentTeam.role !== 'member'
         ? [
               {
-                  title: tr('Equipos', 'Teams'),
-                  href: teams(),
+                  title: tr('Facturación', 'Billing'),
+                  href: editBilling(page.props.currentTeam.slug),
               },
           ]
         : []),

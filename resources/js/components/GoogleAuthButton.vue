@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { usePage } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
-import { redirect } from '@/routes/auth/google';
+import { redirect as googleRedirect } from '@/routes/auth/google';
 
 defineProps<{
     invitation?: string;
+    redirect?: string;
 }>();
 
 const page = usePage();
@@ -18,9 +19,10 @@ const tr = (es: string, en: string): string =>
         variant="outline"
         class="w-full"
         :href="
-            redirect.url({
+            googleRedirect.url({
                 query: {
                     invitation,
+                    redirect,
                 },
             })
         "

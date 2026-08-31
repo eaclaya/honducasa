@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'name', 'filters', 'alerts_enabled', 'last_notified_at'])]
+#[Fillable(['user_id', 'name', 'filters', 'fingerprint', 'alerts_enabled', 'last_notified_at'])]
 class SavedSearch extends Model
 {
     /** @use HasFactory<SavedSearchFactory> */

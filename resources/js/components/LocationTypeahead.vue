@@ -64,8 +64,18 @@ const typeLabel = (type: string): string => {
 
 const controlClasses = computed(() =>
     props.variant === 'hero'
-        ? 'flex h-full items-center gap-3 rounded-2xl px-4 py-3 focus-within:bg-stone-50'
-        : 'flex h-full items-center gap-3 rounded-2xl bg-stone-50 px-4 py-3 ring-blue-600 focus-within:ring-2',
+        ? 'flex h-full items-center gap-3 rounded-[10px] px-6 py-3'
+        : 'flex h-full items-center gap-3 rounded-[10px] px-5 py-3',
+);
+
+const popupPositionClasses = computed(() =>
+    props.variant === 'hero'
+        ? '-left-2 w-[calc(100%+0.5rem)]'
+        : 'left-0 w-full',
+);
+
+const popupContentPaddingClasses = computed(() =>
+    props.variant === 'hero' ? 'px-8' : 'px-5',
 );
 
 const updateSuggestions = (value: string = props.modelValue): void => {
@@ -153,7 +163,7 @@ onBeforeUnmount(() => {
                 >
                 <input
                     :value="modelValue"
-                    class="w-full bg-transparent text-sm font-semibold text-[#13233a] outline-none placeholder:text-stone-500"
+                    class="w-full bg-transparent text-sm font-semibold text-[var(--public-text)] outline-none placeholder:text-[var(--public-muted)]"
                     :placeholder="placeholder"
                     autocomplete="off"
                     role="combobox"
@@ -185,13 +195,15 @@ onBeforeUnmount(() => {
                     http.processing ||
                     searched)
             "
-            class="absolute top-[calc(100%+0.5rem)] left-0 z-50 w-full min-w-72 overflow-hidden rounded-2xl border border-stone-200 bg-white text-[#13233a] shadow-xl"
+            class="absolute top-[calc(100%+0.5rem)] z-50 min-w-72 overflow-hidden rounded-2xl border border-[var(--public-border)] bg-[var(--public-surface-raised)] text-[var(--public-text)] shadow-xl"
+            :class="popupPositionClasses"
             role="listbox"
         >
             <button
                 v-if="showNearMe"
                 type="button"
-                class="flex w-full items-center gap-3 border-b border-stone-200 px-4 py-3 text-left transition hover:bg-blue-50 disabled:cursor-wait disabled:opacity-70"
+                class="flex w-full items-center gap-3 border-b border-stone-200 py-3 text-left transition hover:bg-blue-50 disabled:cursor-wait disabled:opacity-70"
+                :class="popupContentPaddingClasses"
                 :disabled="locating"
                 @mousedown.prevent
                 @click="emit('nearby')"
@@ -223,8 +235,11 @@ onBeforeUnmount(() => {
                 v-for="(suggestion, index) in suggestions"
                 :key="suggestion.id"
                 type="button"
-                class="flex w-full items-center justify-between gap-4 border-b border-stone-100 px-4 py-3 text-left last:border-b-0 hover:bg-blue-50"
-                :class="{ 'bg-blue-50': activeIndex === index }"
+                class="flex w-full items-center justify-between gap-4 border-b border-stone-100 py-3 text-left last:border-b-0 hover:bg-blue-50"
+                :class="[
+                    popupContentPaddingClasses,
+                    { 'bg-blue-50': activeIndex === index },
+                ]"
                 role="option"
                 :aria-selected="activeIndex === index"
                 @mousedown.prevent
@@ -256,14 +271,16 @@ onBeforeUnmount(() => {
 
             <p
                 v-if="searched && !http.processing && suggestions.length === 0"
-                class="px-4 py-4 text-sm text-stone-500"
+                class="py-4 text-sm text-stone-500"
+                :class="popupContentPaddingClasses"
             >
                 {{ tr('No encontramos ubicaciones.', 'No locations found.') }}
             </p>
 
             <p
                 v-if="locationError"
-                class="border-t border-stone-200 px-4 py-3 text-xs text-red-600"
+                class="border-t border-stone-200 py-3 text-xs text-red-600"
+                :class="popupContentPaddingClasses"
                 role="alert"
             >
                 {{ locationError }}

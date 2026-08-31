@@ -2,6 +2,7 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import { ArrowLeft } from '@lucide/vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
+import GoogleOneTap from '@/components/GoogleOneTap.vue';
 import { Button } from '@/components/ui/button';
 import { home } from '@/routes';
 
@@ -17,8 +18,9 @@ const tr = (es: string, en: string): string =>
 
 <template>
     <div
-        class="relative flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10"
+        class="relative flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 text-foreground md:p-10"
     >
+        <GoogleOneTap />
         <Button
             as-child
             variant="ghost"
@@ -40,7 +42,7 @@ const tr = (es: string, en: string): string =>
                             class="mb-1 flex h-9 w-9 items-center justify-center rounded-md"
                         >
                             <AppLogoIcon
-                                class="size-9 fill-current text-[var(--foreground)] dark:text-white"
+                                class="size-9 fill-current text-foreground"
                             />
                         </div>
                         <span class="sr-only">{{ title }}</span>

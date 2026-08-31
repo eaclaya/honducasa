@@ -1,6 +1,19 @@
 name: honducasa
 
 services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6381:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   database:
     image: postgis/postgis:17-3.5
     platform: linux/amd64
@@ -39,6 +52,45 @@ services:
       retries: 15
       start_period: 5s
 
+  # Local SMTP catcher — mail sent by the app in dev lands here instead of a
+  # real inbox. Web UI at http://127.0.0.1:8026; SMTP on 2525 (matches
+  # MAIL_HOST/MAIL_PORT in .env).
+  mailpit:
+    image: axllent/mailpit
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:2525:1025'
+      - '127.0.0.1:8026:8025'
+
+  # Runs the queue worker so it doesn't depend on someone starting
+  # `php artisan horizon` by hand — the app itself still runs natively via
+  # Herd, only the worker runs in Docker. Reads `.env` for everything (APP_KEY,
+  # etc.) but overrides the host-relative connection settings, since `.env`
+  # points at 127.0.0.1:<host-mapped-port> for Herd's native PHP, which isn't
+  # reachable from inside a container — here the other services are reached
+  # by their compose service name on the container-internal port instead.
+  horizon:
+    build:
+      context: .
+      dockerfile: docker/horizon/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - .:/var/www/html
+    env_file:
+      - .env
+    environment:
+      DB_HOST: database
+      DB_PORT: '5432'
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      MAIL_HOST: mailpit
+      MAIL_PORT: '1025'
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   # Self-hosted location search (see PropertyLocationPicker.vue and
   # PlaceSearchController) — Mapbox's own geocoding data for Honduras is too thin
   # for real places (colonias, hospitals, landmarks), so search is proxied through
@@ -65,3 +117,4 @@ services:
 volumes:
   database-data:
   nominatim-data:
+  redis-data:

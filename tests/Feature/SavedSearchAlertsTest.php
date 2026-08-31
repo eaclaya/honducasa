@@ -26,6 +26,29 @@ test('the command sends a private notification when a new listing matches', func
     expect($search->fresh()->last_notified_at)->not->toBeNull();
 });
 
+test('saved search alerts compare price filters across currencies', function () {
+    Notification::fake();
+    $user = User::factory()->create();
+    SavedSearch::factory()->create([
+        'user_id' => $user->id,
+        'filters' => ['currency' => 'HNL', 'min_price' => 24_000],
+        'created_at' => now()->subHour(),
+    ]);
+    Property::factory()->create([
+        'currency' => 'USD',
+        'price_amount' => 1_000,
+        'published_at' => now(),
+    ]);
+
+    $this->artisan('app:send-saved-search-alerts')->assertSuccessful();
+
+    Notification::assertSentTo(
+        $user,
+        SavedSearchMatchesFound::class,
+        fn ($notification) => $notification->matchCount === 1,
+    );
+});
+
 test('the command does not notify for old or nonmatching listings', function () {
     Notification::fake();
     $user = User::factory()->create();

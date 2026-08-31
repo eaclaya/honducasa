@@ -2,6 +2,7 @@
 
 namespace App\Http\Responses;
 
+use App\Actions\Auth\ExecutePendingAuthAction;
 use App\Http\Responses\Concerns\RedirectsToCurrentTeam;
 use Illuminate\Http\JsonResponse;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
@@ -12,10 +13,16 @@ class LoginResponse implements LoginResponseContract
 {
     use RedirectsToCurrentTeam;
 
+    public function __construct(private ExecutePendingAuthAction $executePendingAuthAction) {}
+
     public function toResponse($request): Response
     {
+        if ($redirect = $this->executePendingAuthAction->handle($request, $request->user())) {
+            return redirect($redirect);
+        }
+
         return $request->wantsJson()
             ? new JsonResponse(['two_factor' => false], 200)
-            : redirect()->intended($this->redirectPathForCurrentTeam($request, Fortify::redirects('login')));
+            : redirect()->intended($this->requestedRedirect($request) ?? $this->redirectPathForCurrentTeam($request, Fortify::redirects('login')));
     }
 }

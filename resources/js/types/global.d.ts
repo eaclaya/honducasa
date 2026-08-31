@@ -20,6 +20,9 @@ declare module '@inertiajs/core' {
             name: string;
             locale: 'es' | 'en';
             auth: Auth;
+            googleOneTap: {
+                clientId: string | null;
+            };
             sidebarOpen: boolean;
             currentTeam: Team | null;
             teams: Team[];

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 /*
@@ -44,7 +45,19 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
-{
-    // ..
+function compressedListingPhoto(
+    string $name = 'listing.webp',
+    int $width = 1200,
+    int $height = 800,
+    int $quality = 82,
+): UploadedFile {
+    $image = imagecreatetruecolor($width, $height);
+
+    ob_start();
+    imagewebp($image, null, $quality);
+    $contents = ob_get_clean();
+
+    imagedestroy($image);
+
+    return UploadedFile::fake()->createWithContent($name, $contents);
 }

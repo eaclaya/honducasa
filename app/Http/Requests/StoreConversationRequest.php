@@ -22,7 +22,7 @@ class StoreConversationRequest extends FormRequest
         if ($this->user() === null
             || ! $property instanceof Property
             || $property->status !== ListingStatus::Published
-            || $this->user()->belongsToTeam($property->team)) {
+            || $property->isOwnedBy($this->user())) {
             return false;
         }
 

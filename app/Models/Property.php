@@ -28,7 +28,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 /**
  * @property int $id
- * @property int $team_id
+ * @property int|null $team_id
  * @property int $location_id
  * @property int $created_by
  * @property PropertyType $type
@@ -53,13 +53,17 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property Furnishing $furnishing
  * @property int $price_amount
  * @property string $currency
+ * @property string|null $normalized_price_amount
+ * @property string|null $normalized_currency
+ * @property string|null $normalization_rate
+ * @property Carbon|null $price_normalized_at
  * @property int|null $deposit_amount
  * @property bool $utilities_included
  * @property string|null $description
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
- * @property-read Team $team
+ * @property-read Team|null $team
  * @property-read Location $location
  * @property-read User $creator
  * @property-read Collection<int, Conversation> $conversations
@@ -89,6 +93,10 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
     'furnishing',
     'price_amount',
     'currency',
+    'normalized_price_amount',
+    'normalized_currency',
+    'normalization_rate',
+    'price_normalized_at',
     'deposit_amount',
     'utilities_included',
     'description',
@@ -104,7 +112,7 @@ class Property extends Model implements HasMedia
     private const string WITHIN_RADIUS_CONDITION = 'ST_DWithin(coordinates, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)';
 
     /**
-     * Get the team that owns the property.
+     * Get the agency that owns the property, if this is an agency listing.
      *
      * @return BelongsTo<Team, $this>
      */
@@ -199,7 +207,16 @@ class Property extends Model implements HasMedia
     {
         return $query
             ->where('status', ListingStatus::Published)
-            ->whereHas('team', fn (Builder $team) => $team->whereNull('suspended_at'));
+            ->where(fn (Builder $ownership) => $ownership
+                ->whereNull('team_id')
+                ->orWhereHas('team', fn (Builder $team) => $team->whereNull('suspended_at')));
+    }
+
+    public function isOwnedBy(User $user): bool
+    {
+        return $this->team_id === null
+            ? $this->created_by === $user->id
+            : $user->teams()->whereKey($this->team_id)->exists();
     }
 
     /**
@@ -226,6 +243,9 @@ class Property extends Model implements HasMedia
             'year_built' => 'integer',
             'furnishing' => Furnishing::class,
             'price_amount' => 'integer',
+            'normalized_price_amount' => 'decimal:6',
+            'normalization_rate' => 'decimal:10',
+            'price_normalized_at' => 'datetime',
             'deposit_amount' => 'integer',
             'utilities_included' => 'boolean',
         ];

@@ -14,8 +14,10 @@ test('a renter starts one property conversation and sends messages inside the ap
     $renter = User::factory()->create();
 
     $this->actingAs($renter)
+        ->from(route('properties.show', $property))
         ->post(route('conversations.store', $property), ['body' => 'Me interesa conocer las condiciones y disponibilidad de esta propiedad.'])
-        ->assertRedirect();
+        ->assertRedirect(route('properties.show', $property))
+        ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Mensaje enviado.']);
 
     $conversation = Conversation::query()->sole();
     expect($conversation->property_id)->toBe($property->id)
@@ -24,11 +26,19 @@ test('a renter starts one property conversation and sends messages inside the ap
         ->and($conversation->messages()->sole()->body)->toContain('disponibilidad');
 
     $this->actingAs($renter)
+        ->from(route('properties.show', $property))
         ->post(route('conversations.store', $property), ['body' => 'También quisiera saber cuándo se puede visitar la propiedad.'])
-        ->assertRedirect(route('messages.show', $conversation));
+        ->assertRedirect(route('properties.show', $property))
+        ->assertInertiaFlash('toast', ['type' => 'info', 'message' => 'La conversación ya fue iniciada.']);
 
     expect(Conversation::query()->count())->toBe(1)
-        ->and($conversation->messages()->count())->toBe(2);
+        ->and($conversation->messages()->count())->toBe(1);
+
+    $this->actingAs($renter)
+        ->get(route('properties.show', $property))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('properties/Show')
+            ->where('property.messaging.existingConversationId', $conversation->id));
 });
 
 test('contact details and external links are rejected from chat messages', function (string $body) {

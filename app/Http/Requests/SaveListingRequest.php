@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Actions\Listings\SetListingStatus;
+use App\Actions\Moderation\RecordModerationStrike;
 use App\Data\GeoPoint;
 use App\Enums\ApproximateLocationShape;
 use App\Enums\Furnishing;
@@ -10,8 +11,10 @@ use App\Enums\ListingStatus;
 use App\Enums\ListingType;
 use App\Enums\LocationPrecision;
 use App\Enums\PropertyType;
+use App\Exceptions\ContentModerationUnavailableException;
 use App\Models\Location;
 use App\Models\Property;
+use App\Services\ListingTextModerationPipeline;
 use App\Support\NearestCity;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -34,7 +37,7 @@ class SaveListingRequest extends FormRequest
             'listing_type' => ['required', Rule::enum(ListingType::class)],
             'status' => ['required', Rule::enum(ListingStatus::class)],
             'price_amount' => ['required', 'integer', 'min:1'],
-            'currency' => ['required', Rule::in(['HNL', 'USD'])],
+            'currency' => ['required', Rule::in(array_keys(config('currencies.supported', [])))],
             'deposit_amount' => ['nullable', 'integer', 'min:0'],
             'utilities_included' => ['required', 'boolean'],
             'bedrooms' => ['required', 'integer', 'min:0', 'max:20'],
@@ -154,7 +157,7 @@ class SaveListingRequest extends FormRequest
                 }
             },
             function (Validator $validator): void {
-                $submittedIds = collect($this->input('images', []))->map(fn ($id) => (int) $id);
+                $submittedIds = collect($this->array('images'))->map(fn ($id) => (int) $id);
 
                 if ($submittedIds->isEmpty()) {
                     return;
@@ -165,7 +168,49 @@ class SaveListingRequest extends FormRequest
                     ->merge($listing instanceof Property ? $listing->getMedia('photos')->pluck('id') : []);
 
                 if ($submittedIds->diff($ownedIds)->isNotEmpty()) {
-                    $validator->errors()->add('images', 'One of the selected photos is invalid.');
+                    $validator->errors()->add('images', __('One of the selected photos is invalid.'));
+                }
+            },
+            function (Validator $validator): void {
+                if ($validator->errors()->isNotEmpty()) {
+                    return;
+                }
+
+                try {
+                    $moderation = app(ListingTextModerationPipeline::class)->moderate([
+                        'name' => $this->input('name'),
+                        'description' => $this->input('description'),
+                        'address_line' => $this->input('address_line'),
+                    ]);
+                } catch (ContentModerationUnavailableException) {
+                    $validator->errors()->add(
+                        'name',
+                        __('Content moderation is temporarily unavailable. Please try again.'),
+                    );
+
+                    return;
+                }
+
+                $flaggedFields = $moderation['flagged_fields'];
+
+                if ($flaggedFields !== [] && ! $this->isPrecognitive()) {
+                    app(RecordModerationStrike::class)->handle(
+                        $this->user(),
+                        'listing_text',
+                        'Automated text moderation flagged listing content.',
+                        [
+                            'fields' => $flaggedFields,
+                            'profanity_fields' => $moderation['profanity_fields'],
+                            'openai_fields' => $moderation['openai_fields'],
+                        ],
+                    );
+                }
+
+                foreach ($flaggedFields as $field) {
+                    $validator->errors()->add(
+                        $field,
+                        __('This field contains content that is not allowed.'),
+                    );
                 }
             },
         ];

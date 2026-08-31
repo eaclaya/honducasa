@@ -2,6 +2,8 @@
 
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\URL;
 
@@ -11,6 +13,24 @@ test('email verification screen can be rendered', function () {
     $response = $this->actingAs($user)->get(route('verification.notice'));
 
     $response->assertOk();
+});
+
+test('users prefer the Spanish locale for mail and notifications', function () {
+    $user = User::factory()->create();
+
+    expect($user->preferredLocale())->toBe('es');
+});
+
+test('the verification email is translated into Spanish', function () {
+    App::setLocale('es');
+
+    $user = User::factory()->unverified()->create();
+
+    $mail = (new VerifyEmail)->toMail($user);
+
+    expect($mail->subject)->toBe('Verifica tu correo electrónico')
+        ->and($mail->introLines)->toContain('Haz clic en el botón de abajo para verificar tu correo electrónico.')
+        ->and($mail->actionText)->toBe('Verificar correo electrónico');
 });
 
 test('email can be verified', function () {

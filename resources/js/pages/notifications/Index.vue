@@ -105,7 +105,7 @@ const openNotification = (item: NotificationItem): void => {
                     ></span
                 ><span
                     v-if="!item.isRead"
-                    class="mt-2 size-2 shrink-0 rounded-full bg-blue-600"
+                    class="mt-2 size-2 shrink-0 rounded-full bg-primary"
                 />
             </button>
         </div>

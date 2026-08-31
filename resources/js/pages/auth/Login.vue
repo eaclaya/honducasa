@@ -2,7 +2,6 @@
 import { Form, Head, usePage } from '@inertiajs/vue3';
 import GoogleAuthButton from '@/components/GoogleAuthButton.vue';
 import InputError from '@/components/InputError.vue';
-import PasskeyVerify from '@/components/PasskeyVerify.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
 import TeamInvitationAlert from '@/components/TeamInvitationAlert.vue';
 import TextLink from '@/components/TextLink.vue';
@@ -45,7 +44,7 @@ const tr = (es: string, en: string): string =>
 
     <div
         v-if="status"
-        class="mb-4 text-center text-sm font-medium text-green-600"
+        class="mb-4 text-center text-sm font-medium text-success"
     >
         {{ status }}
     </div>
@@ -68,8 +67,6 @@ const tr = (es: string, en: string): string =>
             <span class="absolute inset-x-0 top-1/2 border-t" />
         </div>
     </div>
-
-    <PasskeyVerify />
 
     <Form
         v-bind="store.form()"

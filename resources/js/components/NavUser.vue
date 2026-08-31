@@ -22,6 +22,9 @@ const user = page.props.auth.user;
 const { isMobile, state } = useSidebar();
 
 const currentTeam = computed(() => page.props.currentTeam as Team | null);
+const visibleTeam = computed(() =>
+    currentTeam.value?.isPersonal ? null : currentTeam.value,
+);
 </script>
 
 <template>
@@ -34,7 +37,7 @@ const currentTeam = computed(() => page.props.currentTeam as Team | null);
                         class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         data-test="sidebar-menu-button"
                     >
-                        <UserInfo :user="user" :team="currentTeam" />
+                        <UserInfo :user="user" :team="visibleTeam" />
                         <ChevronsUpDown class="ml-auto size-4" />
                     </SidebarMenuButton>
                 </DropdownMenuTrigger>

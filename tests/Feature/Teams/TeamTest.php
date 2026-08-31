@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\SubscriptionLadder;
 use App\Enums\TeamRole;
+use App\Models\SubscriptionPlan;
 use App\Models\Team;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -15,13 +17,15 @@ test('the teams index page can be rendered', function () {
     $response->assertOk();
 });
 
-test('teams can be created', function () {
+test('agencies can be created with an agency plan', function () {
     $user = User::factory()->withPersonalTeam()->create();
+    $plan = SubscriptionPlan::factory()->create(['ladder' => SubscriptionLadder::Agency]);
 
     $response = $this
         ->actingAs($user)
-        ->post(route('teams.store'), [
+        ->post(route('agencies.store'), [
             'name' => 'Test Team',
+            'subscription_plan_id' => $plan->id,
         ]);
 
     $response->assertRedirect();
@@ -30,10 +34,15 @@ test('teams can be created', function () {
         'name' => 'Test Team',
         'is_personal' => false,
     ]);
+
+    $team = Team::query()->where('name', 'Test Team')->sole();
+    expect($team->trial_ends_at)->not->toBeNull()
+        ->and($team->trial_ends_at->isBetween(now()->addDays(29), now()->addDays(31)))->toBeTrue();
 });
 
 test('team slug uses next available suffix', function () {
     $user = User::factory()->withPersonalTeam()->create();
+    $plan = SubscriptionPlan::factory()->create(['ladder' => SubscriptionLadder::Agency]);
 
     Team::factory()->create(['name' => 'Acme', 'slug' => 'acme']);
     Team::factory()->create(['name' => 'Acme One', 'slug' => 'acme-1']);
@@ -41,8 +50,9 @@ test('team slug uses next available suffix', function () {
 
     $this
         ->actingAs($user)
-        ->post(route('teams.store'), [
+        ->post(route('agencies.store'), [
             'name' => 'Acme',
+            'subscription_plan_id' => $plan->id,
         ]);
 
     $this->assertDatabaseHas('teams', [

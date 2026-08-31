@@ -12,6 +12,7 @@ import {
 import type { LayerGroup, Map as LeafletMap } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { createSwipeGesture } from '@/lib/swipeGesture';
 import { show as propertyShow } from '@/routes/properties';
 
 type MapProperty = {
@@ -25,11 +26,17 @@ type MapProperty = {
     bathrooms: string;
     parkingSpaces: number;
     interiorAreaM2: number | null;
+    furnishing: string;
     priceAmount: number;
     currency: string;
+    priceIsConverted: boolean;
+    depositAmount: number | null;
+    utilitiesIncluded: boolean;
     mapLatitude: number;
     mapLongitude: number;
     primaryImage: { url: string; altText: string | null } | null;
+    images: Array<{ url: string; altText: string | null }>;
+    isFavorited: boolean;
 };
 type Bounds = {
     west: number;
@@ -41,8 +48,12 @@ type Bounds = {
 const props = defineProps<{
     properties: MapProperty[];
     initialBounds: Bounds | null;
+    returnTo?: string;
 }>();
-const emit = defineEmits<{ search: [bounds: Bounds] }>();
+const emit = defineEmits<{
+    favorite: [property: MapProperty];
+    search: [bounds: Bounds];
+}>();
 
 const mapContainer = ref<HTMLElement | null>(null);
 const pendingBounds = ref<Bounds | null>(null);
@@ -54,6 +65,18 @@ const mapboxStyle = import.meta.env.VITE_MAPBOX_STYLE ?? 'mapbox/streets-v12';
 let map: LeafletMap | null = null;
 let resultLayers: LayerGroup | null = null;
 let isReady = false;
+let isFittingResults = false;
+
+const resultViewportKey = computed(() =>
+    JSON.stringify({
+        bounds: props.initialBounds,
+        points: props.properties.map((property) => [
+            property.id,
+            property.mapLatitude,
+            property.mapLongitude,
+        ]),
+    }),
+);
 
 const formatPrice = (property: MapProperty): string =>
     new Intl.NumberFormat(locale.value === 'es' ? 'es-HN' : 'en-US', {
@@ -75,35 +98,183 @@ const humanize = (value: string): string =>
         .replaceAll('_', ' ')
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
+const propertyDetailsUrl = (property: MapProperty): string =>
+    propertyShow.url(property.slug, {
+        query: { return_to: props.returnTo },
+    });
+
+const createIcon = (paths: string[], viewBox = '0 0 24 24'): SVGSVGElement => {
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.setAttribute('fill', 'none');
+    icon.setAttribute('stroke', 'currentColor');
+    icon.setAttribute('stroke-linecap', 'round');
+    icon.setAttribute('stroke-linejoin', 'round');
+    icon.setAttribute('stroke-width', '2');
+    icon.setAttribute('viewBox', viewBox);
+
+    for (const pathData of paths) {
+        const path = document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            'path',
+        );
+        path.setAttribute('d', pathData);
+        icon.append(path);
+    }
+
+    return icon;
+};
+
 const createPropertyPreview = (property: MapProperty): HTMLElement => {
     const preview = document.createElement('article');
     preview.className = 'honducasa-map-preview';
 
-    if (property.primaryImage) {
-        const image = document.createElement('img');
-        image.className = 'honducasa-map-preview__image';
-        image.src = property.primaryImage.url;
-        image.alt =
-            property.primaryImage.altText ??
-            property.name ??
-            (locale.value === 'es' ? 'Propiedad' : 'Property');
-        preview.append(image);
+    const gallery = document.createElement('div');
+    gallery.className = 'honducasa-map-preview__gallery';
+    gallery.tabIndex = 0;
+    gallery.setAttribute('role', 'link');
+    gallery.setAttribute(
+        'aria-label',
+        locale.value === 'es' ? 'Ver propiedad' : 'View property',
+    );
+    gallery.addEventListener('click', () => {
+        if (!gallerySwipe.shouldSuppressClick()) {
+            router.visit(propertyDetailsUrl(property));
+        }
+    });
+    gallery.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            router.visit(propertyDetailsUrl(property));
+        }
+    });
+
+    const images = property.images.length
+        ? property.images
+        : property.primaryImage
+          ? [property.primaryImage]
+          : [];
+    let activeImageIndex = 0;
+    const image = document.createElement('img');
+    image.className = 'honducasa-map-preview__image';
+
+    const indicators = document.createElement('div');
+    indicators.className = 'honducasa-map-preview__indicators';
+
+    const renderGalleryImage = (): void => {
+        const activeImage = images[activeImageIndex];
+
+        if (activeImage) {
+            image.src = activeImage.url;
+            image.alt =
+                activeImage.altText ??
+                property.name ??
+                (locale.value === 'es' ? 'Propiedad' : 'Property');
+        }
+
+        [...indicators.children].forEach((indicator, index) => {
+            indicator.classList.toggle(
+                'honducasa-map-preview__indicator--active',
+                index === activeImageIndex,
+            );
+        });
+    };
+
+    const gallerySwipe = createSwipeGesture({
+        onSwipeLeft: () => {
+            activeImageIndex = (activeImageIndex + 1) % images.length;
+            renderGalleryImage();
+        },
+        onSwipeRight: () => {
+            activeImageIndex =
+                (activeImageIndex - 1 + images.length) % images.length;
+            renderGalleryImage();
+        },
+    });
+
+    if (images.length) {
+        gallery.append(image);
+        image.draggable = false;
+    } else {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'honducasa-map-preview__placeholder';
+        placeholder.textContent =
+            locale.value === 'es' ? 'Sin foto' : 'No photo';
+        gallery.append(placeholder);
     }
+
+    if (images.length > 1) {
+        gallery.addEventListener('pointerdown', gallerySwipe.onPointerDown);
+        gallery.addEventListener('pointerup', gallerySwipe.onPointerUp);
+        gallery.addEventListener('pointercancel', gallerySwipe.onPointerCancel);
+
+        const previousButton = document.createElement('button');
+        previousButton.type = 'button';
+        previousButton.className =
+            'honducasa-map-preview__gallery-button honducasa-map-preview__gallery-button--previous';
+        previousButton.ariaLabel =
+            locale.value === 'es' ? 'Foto anterior' : 'Previous photo';
+        previousButton.append(createIcon(['m15 18-6-6 6-6']));
+        previousButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            activeImageIndex =
+                (activeImageIndex - 1 + images.length) % images.length;
+            renderGalleryImage();
+        });
+
+        const nextButton = document.createElement('button');
+        nextButton.type = 'button';
+        nextButton.className =
+            'honducasa-map-preview__gallery-button honducasa-map-preview__gallery-button--next';
+        nextButton.ariaLabel =
+            locale.value === 'es' ? 'Foto siguiente' : 'Next photo';
+        nextButton.append(createIcon(['m9 18 6-6-6-6']));
+        nextButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            activeImageIndex = (activeImageIndex + 1) % images.length;
+            renderGalleryImage();
+        });
+
+        images.forEach(() => {
+            const indicator = document.createElement('span');
+            indicator.className = 'honducasa-map-preview__indicator';
+            indicators.append(indicator);
+        });
+        gallery.append(previousButton, nextButton, indicators);
+    }
+
+    const favoriteButton = document.createElement('button');
+    favoriteButton.type = 'button';
+    favoriteButton.className = 'honducasa-map-preview__favorite';
+    favoriteButton.classList.toggle(
+        'honducasa-map-preview__favorite--active',
+        property.isFavorited,
+    );
+    favoriteButton.ariaLabel = property.isFavorited
+        ? locale.value === 'es'
+            ? 'Quitar de favoritos'
+            : 'Remove from favorites'
+        : locale.value === 'es'
+          ? 'Guardar propiedad'
+          : 'Save property';
+    favoriteButton.append(
+        createIcon([
+            'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z',
+        ]),
+    );
+    favoriteButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        emit('favorite', property);
+    });
+
+    gallery.append(favoriteButton);
+    renderGalleryImage();
+    preview.append(gallery);
 
     const content = document.createElement('div');
     content.className = 'honducasa-map-preview__content';
-
-    const eyebrow = document.createElement('p');
-    eyebrow.className = 'honducasa-map-preview__eyebrow';
-    eyebrow.textContent = `${humanize(property.type)} · ${
-        property.listingType === 'rent'
-            ? locale.value === 'es'
-                ? 'Alquiler'
-                : 'For rent'
-            : locale.value === 'es'
-              ? 'Venta'
-              : 'For sale'
-    }`;
+    content.tabIndex = 0;
+    content.setAttribute('role', 'link');
 
     const title = document.createElement('h3');
     title.className = 'honducasa-map-preview__title';
@@ -127,9 +298,6 @@ const createPropertyPreview = (property: MapProperty): HTMLElement => {
         .filter(Boolean)
         .join(' · ');
 
-    const footer = document.createElement('div');
-    footer.className = 'honducasa-map-preview__footer';
-
     const price = document.createElement('strong');
     price.className = 'honducasa-map-preview__price';
     price.textContent = `${formatPreviewPrice(property)}${
@@ -140,46 +308,16 @@ const createPropertyPreview = (property: MapProperty): HTMLElement => {
             : ''
     }`;
 
-    const viewButton = document.createElement('button');
-    viewButton.className = 'honducasa-map-preview__button';
-    viewButton.type = 'button';
-    viewButton.ariaLabel =
-        locale.value === 'es' ? 'Ver propiedad' : 'View property';
-    viewButton.title = viewButton.ariaLabel;
-
-    const searchIcon = document.createElementNS(
-        'http://www.w3.org/2000/svg',
-        'svg',
+    content.addEventListener('click', () =>
+        router.visit(propertyDetailsUrl(property)),
     );
-    searchIcon.setAttribute('aria-hidden', 'true');
-    searchIcon.setAttribute('fill', 'none');
-    searchIcon.setAttribute('stroke', 'currentColor');
-    searchIcon.setAttribute('stroke-linecap', 'round');
-    searchIcon.setAttribute('stroke-linejoin', 'round');
-    searchIcon.setAttribute('stroke-width', '2');
-    searchIcon.setAttribute('viewBox', '0 0 24 24');
-
-    const searchCircle = document.createElementNS(
-        'http://www.w3.org/2000/svg',
-        'circle',
-    );
-    searchCircle.setAttribute('cx', '11');
-    searchCircle.setAttribute('cy', '11');
-    searchCircle.setAttribute('r', '8');
-
-    const searchHandle = document.createElementNS(
-        'http://www.w3.org/2000/svg',
-        'path',
-    );
-    searchHandle.setAttribute('d', 'm21 21-4.3-4.3');
-    searchIcon.append(searchCircle, searchHandle);
-    viewButton.append(searchIcon);
-    viewButton.addEventListener('click', () =>
-        router.visit(propertyShow.url(property.slug)),
-    );
-
-    footer.append(price, viewButton);
-    content.append(eyebrow, title, location, features, footer);
+    content.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            router.visit(propertyDetailsUrl(property));
+        }
+    });
+    content.append(price, features, title, location);
     preview.append(content);
 
     return preview;
@@ -205,7 +343,7 @@ const createMultiPropertyPreview = (properties: MapProperty[]): HTMLElement => {
         item.type = 'button';
         item.className = 'honducasa-map-preview-list__item';
         item.addEventListener('click', () =>
-            router.visit(propertyShow.url(property.slug)),
+            router.visit(propertyDetailsUrl(property)),
         );
 
         if (property.primaryImage) {
@@ -328,7 +466,8 @@ const renderMarkers = (): void => {
                 title: formatPrice(property),
             });
             propertyMarker.bindPopup(createPropertyPreview(property), {
-                className: 'honducasa-property-popup',
+                className:
+                    'honducasa-property-popup honducasa-property-card-popup',
                 maxWidth: 320,
                 minWidth: 280,
                 offset: [0, -10],
@@ -368,7 +507,7 @@ const renderMarkers = (): void => {
 };
 
 const captureBounds = (): void => {
-    if (!map || !isReady) {
+    if (!map || !isReady || isFittingResults) {
         return;
     }
 
@@ -391,11 +530,49 @@ const searchBounds = (): void => {
     showSearchButton.value = false;
 };
 
+const fitResultBounds = (): void => {
+    if (!map) {
+        return;
+    }
+
+    isFittingResults = true;
+    pendingBounds.value = null;
+    showSearchButton.value = false;
+    map.once('moveend', () => (isFittingResults = false));
+
+    if (props.initialBounds) {
+        map.fitBounds([
+            [props.initialBounds.south, props.initialBounds.west],
+            [props.initialBounds.north, props.initialBounds.east],
+        ]);
+
+        return;
+    }
+
+    if (props.properties.length) {
+        map.fitBounds(
+            latLngBounds(
+                props.properties.map((property) => [
+                    property.mapLatitude,
+                    property.mapLongitude,
+                ]),
+            ),
+            { maxZoom: 13, padding: [40, 40] },
+        );
+
+        return;
+    }
+
+    isFittingResults = false;
+};
+
 watch(
     () => props.properties,
     () => renderMarkers(),
     { deep: true },
 );
+
+watch(resultViewportKey, () => fitResultBounds());
 
 onMounted(() => {
     if (!mapboxAccessToken) {
@@ -428,22 +605,7 @@ onMounted(() => {
         .addTo(mapInstance);
     renderMarkers();
 
-    if (props.initialBounds) {
-        mapInstance.fitBounds([
-            [props.initialBounds.south, props.initialBounds.west],
-            [props.initialBounds.north, props.initialBounds.east],
-        ]);
-    } else if (props.properties.length) {
-        mapInstance.fitBounds(
-            latLngBounds(
-                props.properties.map((property) => [
-                    property.mapLatitude,
-                    property.mapLongitude,
-                ]),
-            ),
-            { maxZoom: 13, padding: [40, 40] },
-        );
-    }
+    fitResultBounds();
 
     window.setTimeout(() => (isReady = true), 500);
     mapInstance.on('dragend', captureBounds);
@@ -458,7 +620,7 @@ onBeforeUnmount(() => map?.remove());
 
 <template>
     <div
-        class="relative h-full min-h-[520px] overflow-hidden rounded-[1.75rem] border border-stone-200 bg-stone-100"
+        class="relative h-full min-h-[520px] overflow-hidden rounded-xl border border-[var(--public-border)] bg-[var(--public-surface-hover)]"
     >
         <div
             ref="mapContainer"
@@ -468,7 +630,7 @@ onBeforeUnmount(() => map?.remove());
         <button
             v-if="showSearchButton"
             type="button"
-            class="absolute top-4 left-1/2 z-[500] -translate-x-1/2 rounded-full bg-[#123b6d] px-5 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-xl hover:bg-[#185a96]"
+            class="absolute top-4 left-1/2 z-[500] -translate-x-1/2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold whitespace-nowrap text-primary-foreground shadow-xl hover:bg-primary-hover"
             @click="searchBounds"
         >
             {{ locale === 'es' ? 'Buscar en esta zona' : 'Search this area' }}
@@ -498,13 +660,13 @@ onBeforeUnmount(() => map?.remove());
     min-width: 4.75rem;
     height: 2rem;
     place-items: center;
-    border: 2px solid white;
+    border: 1px solid #dddddd;
     border-radius: 9999px;
-    background: #123b6d;
-    box-shadow: 0 5px 16px rgb(15 23 42 / 0.25);
-    color: white;
+    background: white;
+    color: #2563eb;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: 600;
 }
 
 :deep(.honducasa-cluster-marker span) {
@@ -591,7 +753,7 @@ onBeforeUnmount(() => map?.remove());
 }
 
 :deep(.honducasa-map-preview-list__price) {
-    color: #123b6d;
+    color: #2563eb;
     font-size: 0.8125rem;
     font-weight: 700;
 }
@@ -599,15 +761,15 @@ onBeforeUnmount(() => map?.remove());
 :deep(.leaflet-control-zoom) {
     overflow: hidden;
     border: 0;
-    border-radius: 0.875rem;
-    box-shadow: 0 8px 24px rgb(15 23 42 / 0.15);
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.16);
 }
 
 :deep(.honducasa-property-popup .leaflet-popup-content-wrapper) {
     overflow: hidden;
     border: 0;
-    border-radius: 1.25rem;
-    box-shadow: 0 18px 50px rgb(15 23 42 / 0.28);
+    border-radius: 0.625rem;
+    box-shadow: 0 8px 24px rgb(15 23 42 / 0.24);
 }
 
 :deep(.honducasa-property-popup .leaflet-popup-content) {
@@ -615,52 +777,135 @@ onBeforeUnmount(() => map?.remove());
     margin: 0;
 }
 
-:deep(.honducasa-property-popup .leaflet-popup-close-button) {
-    top: 0.625rem;
-    right: 0.625rem;
-    z-index: 1;
-    display: grid;
-    width: 2rem;
-    height: 2rem;
-    place-items: center;
-    border-radius: 9999px;
-    background: rgb(255 255 255 / 0.92);
-    color: #123b6d;
-    font-size: 1.25rem;
-    box-shadow: 0 4px 12px rgb(15 23 42 / 0.18);
+:deep(.honducasa-property-card-popup .leaflet-popup-close-button) {
+    display: none;
 }
 
 :deep(.honducasa-map-preview) {
+    width: 18rem;
     overflow: hidden;
     background: white;
-    color: #13233a;
+    color: #111827;
 }
 
-:deep(.honducasa-map-preview__image) {
+:deep(.honducasa-map-preview__gallery) {
+    position: relative;
+    height: 10.5rem;
+    overflow: hidden;
+    background: #e2e8f0;
+    cursor: pointer;
+    touch-action: pan-y;
+    user-select: none;
+}
+
+:deep(.honducasa-map-preview__gallery:active) {
+    cursor: grabbing;
+}
+
+:deep(.honducasa-map-preview__image),
+:deep(.honducasa-map-preview__placeholder) {
     display: block;
     width: 100%;
-    height: 9.5rem;
+    height: 100%;
     object-fit: cover;
 }
 
-:deep(.honducasa-map-preview__content) {
-    padding: 1rem;
+:deep(.honducasa-map-preview__placeholder) {
+    display: grid;
+    place-items: center;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 
-:deep(.honducasa-map-preview__eyebrow) {
-    margin: 0 0 0.25rem;
+:deep(.honducasa-map-preview__favorite),
+:deep(.honducasa-map-preview__gallery-button) {
+    position: absolute;
+    z-index: 2;
+    display: grid;
+    width: 2.25rem;
+    height: 2.25rem;
+    place-items: center;
+    border: 0;
+    border-radius: 9999px;
+    background: rgb(255 255 255 / 0.94);
+    color: #111827;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 0.2);
+    cursor: pointer;
+}
+
+:deep(.honducasa-map-preview__favorite) {
+    top: 0.625rem;
+    right: 0.625rem;
+}
+
+:deep(.honducasa-map-preview__favorite--active) {
     color: #2563eb;
-    font-size: 0.6875rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+}
+
+:deep(.honducasa-map-preview__favorite--active svg) {
+    fill: currentColor;
+}
+
+:deep(.honducasa-map-preview__favorite svg) {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+:deep(.honducasa-map-preview__gallery-button) {
+    top: 50%;
+    width: 1.875rem;
+    height: 1.875rem;
+    transform: translateY(-50%);
+}
+
+:deep(.honducasa-map-preview__gallery-button--previous) {
+    left: 0.5rem;
+}
+
+:deep(.honducasa-map-preview__gallery-button--next) {
+    right: 0.5rem;
+}
+
+:deep(.honducasa-map-preview__gallery-button svg) {
+    width: 1rem;
+    height: 1rem;
+}
+
+:deep(.honducasa-map-preview__indicators) {
+    position: absolute;
+    bottom: 0.5rem;
+    left: 50%;
+    z-index: 2;
+    display: flex;
+    gap: 0.3rem;
+    transform: translateX(-50%);
+    border-radius: 9999px;
+    background: rgb(15 23 42 / 0.58);
+    padding: 0.3rem 0.4rem;
+}
+
+:deep(.honducasa-map-preview__indicator) {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: rgb(255 255 255 / 0.56);
+}
+
+:deep(.honducasa-map-preview__indicator--active) {
+    background: white;
+}
+
+:deep(.honducasa-map-preview__content) {
+    padding: 0.875rem 1rem 1rem;
+    cursor: pointer;
 }
 
 :deep(.honducasa-map-preview__title) {
-    margin: 0;
+    margin: 0.375rem 0 0;
     overflow: hidden;
-    font-size: 1rem;
-    font-weight: 750;
+    font-size: 0.875rem;
+    font-weight: 700;
     line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -668,46 +913,16 @@ onBeforeUnmount(() => map?.remove());
 
 :deep(.honducasa-map-preview__location),
 :deep(.honducasa-map-preview__features) {
-    margin: 0.35rem 0 0;
+    margin: 0.375rem 0 0;
     color: #64748b;
-    font-size: 0.75rem;
-    line-height: 1.35;
-}
-
-:deep(.honducasa-map-preview__footer) {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-top: 0.875rem;
+    font-size: 0.8125rem;
+    line-height: 1.3;
 }
 
 :deep(.honducasa-map-preview__price) {
-    color: #123b6d;
-    font-size: 1rem;
+    color: #111827;
+    font-size: 1.25rem;
+    line-height: 1.1;
     white-space: nowrap;
-}
-
-:deep(.honducasa-map-preview__button) {
-    display: grid;
-    width: 3rem;
-    height: 3rem;
-    flex: 0 0 3rem;
-    place-items: center;
-    border: 0;
-    border-radius: 9999px;
-    background: #123b6d;
-    padding: 0;
-    color: white;
-    cursor: pointer;
-}
-
-:deep(.honducasa-map-preview__button svg) {
-    width: 1.25rem;
-    height: 1.25rem;
-}
-
-:deep(.honducasa-map-preview__button:hover) {
-    background: #185a96;
 }
 </style>

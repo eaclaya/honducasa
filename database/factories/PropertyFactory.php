@@ -12,6 +12,7 @@ use App\Enums\PropertyType;
 use App\Models\Location;
 use App\Models\Property;
 use App\Models\User;
+use App\Support\CurrencyConverter;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -60,6 +61,13 @@ class PropertyFactory extends Factory
             'furnishing' => fake()->randomElement(Furnishing::cases()),
             'price_amount' => fake()->numberBetween(5_000, 35_000),
             'currency' => 'HNL',
+            'normalized_price_amount' => fn (array $attributes) => app(CurrencyConverter::class)->toBase(
+                $attributes['price_amount'],
+                $attributes['currency'],
+            ),
+            'normalized_currency' => fn () => app(CurrencyConverter::class)->baseCurrency(),
+            'normalization_rate' => fn (array $attributes) => app(CurrencyConverter::class)->rateToBase($attributes['currency']),
+            'price_normalized_at' => now(),
             'deposit_amount' => fake()->numberBetween(5_000, 35_000),
             'utilities_included' => fake()->boolean(20),
             'description' => fake()->paragraphs(2, true),

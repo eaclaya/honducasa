@@ -2,7 +2,6 @@
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { Eye, LogOut, Pencil, Plus } from '@lucide/vue';
 import { ref } from 'vue';
-import CreateTeamModal from '@/components/CreateTeamModal.vue';
 import Heading from '@/components/Heading.vue';
 import LeaveTeamModal from '@/components/LeaveTeamModal.vue';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +12,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { create as createAgency } from '@/routes/agencies';
 import { edit, index } from '@/routes/teams';
 import type { Team } from '@/types';
 
@@ -36,7 +36,7 @@ defineOptions({
     layout: (props: { locale?: string }) => ({
         breadcrumbs: [
             {
-                title: props.locale === 'es' ? 'Equipos' : 'Teams',
+                title: props.locale === 'es' ? 'Agencias' : 'Agencies',
                 href: index(),
             },
         ],
@@ -49,28 +49,28 @@ const tr = (es: string, en: string): string =>
 </script>
 
 <template>
-    <Head :title="tr('Equipos', 'Teams')" />
+    <Head :title="tr('Agencias', 'Agencies')" />
 
-    <h1 class="sr-only">{{ tr('Equipos', 'Teams') }}</h1>
+    <h1 class="sr-only">{{ tr('Agencias', 'Agencies') }}</h1>
 
     <div class="flex flex-col space-y-6">
         <div class="flex items-center justify-between">
             <Heading
                 variant="small"
-                :title="tr('Equipos', 'Teams')"
+                :title="tr('Agencias', 'Agencies')"
                 :description="
                     tr(
-                        'Administra tus equipos y membresías',
-                        'Manage your teams and team memberships',
+                        'Administra tus agencias y membresías',
+                        'Manage your agencies and memberships',
                     )
                 "
             />
 
-            <CreateTeamModal>
-                <Button data-test="teams-new-team-button">
-                    <Plus /> {{ tr('Nuevo equipo', 'New team') }}
-                </Button>
-            </CreateTeamModal>
+            <Button data-test="teams-new-team-button" as-child>
+                <Link :href="createAgency()">
+                    <Plus /> {{ tr('Crear una agencia', 'Create an agency') }}
+                </Link>
+            </Button>
         </div>
 
         <div class="space-y-3">
@@ -159,8 +159,8 @@ const tr = (es: string, en: string): string =>
             >
                 {{
                     tr(
-                        'Aún no perteneces a ningún equipo.',
-                        "You don't belong to any teams yet.",
+                        'Aún no perteneces a ninguna agencia.',
+                        "You don't belong to any agencies yet.",
                     )
                 }}
             </p>

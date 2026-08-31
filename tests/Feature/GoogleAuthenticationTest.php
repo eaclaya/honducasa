@@ -6,8 +6,13 @@ use App\Models\OauthIdentity;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Notifications\Admin\NewAccountRegistered;
+use App\Services\GoogleIdTokenVerifier;
+use Illuminate\Support\Facades\Notification;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
+
+use function Pest\Laravel\mock;
 
 test('users can start Google authentication', function () {
     Socialite::fake('google');
@@ -17,7 +22,56 @@ test('users can start Google authentication', function () {
     $response->assertRedirect();
 });
 
+test('users can authenticate from the Google One Tap prompt', function () {
+    mock(GoogleIdTokenVerifier::class)
+        ->shouldReceive('verify')
+        ->once()
+        ->with('google-id-token')
+        ->andReturn([
+            'sub' => 'google-one-tap-subject',
+            'name' => 'One Tap User',
+            'email' => 'one-tap@example.com',
+            'email_verified' => true,
+        ]);
+
+    $response = $this->post(route('auth.google.one-tap'), [
+        'credential' => 'google-id-token',
+        'redirect' => '/rentals?city=Tegucigalpa',
+    ]);
+
+    $user = User::query()->where('email', 'one-tap@example.com')->firstOrFail();
+
+    $this->assertAuthenticatedAs($user);
+    $response->assertRedirect('/rentals?city=Tegucigalpa');
+    expect($user->hasVerifiedEmail())->toBeTrue();
+
+    $this->assertDatabaseHas('oauth_identities', [
+        'user_id' => $user->id,
+        'provider' => IdentityProvider::Google->value,
+        'provider_subject' => 'google-one-tap-subject',
+    ]);
+});
+
+test('Google One Tap ignores an off-site return path', function () {
+    mock(GoogleIdTokenVerifier::class)
+        ->shouldReceive('verify')
+        ->once()
+        ->andReturn([
+            'sub' => 'google-one-tap-safe-subject',
+            'name' => 'Safe One Tap User',
+            'email' => 'safe-one-tap@example.com',
+            'email_verified' => true,
+        ]);
+
+    $this->post(route('auth.google.one-tap'), [
+        'credential' => 'google-id-token',
+        'redirect' => 'https://evil.example.com',
+    ])->assertRedirect(route('user.dashboard'));
+});
+
 test('a verified Google identity creates and authenticates a user', function () {
+    Notification::fake();
+    $administrator = User::factory()->create(['is_admin' => true]);
     Socialite::fake('google', SocialiteUser::fake([
         'id' => 'google-subject-1',
         'name' => 'Google User',
@@ -42,9 +96,18 @@ test('a verified Google identity creates and authenticates a user', function () 
         'provider' => IdentityProvider::Google->value,
         'provider_subject' => 'google-subject-1',
     ]);
+
+    Notification::assertSentTo(
+        $administrator,
+        NewAccountRegistered::class,
+        fn (NewAccountRegistered $notification) => $notification->registeredUser->is($user)
+            && $notification->registrationMethod === 'google',
+    );
 });
 
 test('a returning Google identity authenticates the linked user without duplication', function () {
+    Notification::fake();
+    $administrator = User::factory()->create(['is_admin' => true]);
     $user = User::factory()->create();
     OauthIdentity::factory()->for($user)->create([
         'provider_subject' => 'google-subject-2',
@@ -62,6 +125,7 @@ test('a returning Google identity authenticates the linked user without duplicat
 
     $this->assertAuthenticatedAs($user);
     expect(OauthIdentity::query()->count())->toBe(1);
+    Notification::assertNotSentTo($administrator, NewAccountRegistered::class);
 });
 
 test('a suspended user cannot authenticate via Google', function () {
@@ -179,6 +243,36 @@ test('Google signup ignores an invitation sent to a different email', function (
 
     expect($user->teams()->count())->toBe(0)
         ->and($invitation->fresh()->accepted_at)->toBeNull();
+});
+
+test('Google signup returns to the page a redirect field pointed at', function () {
+    Socialite::fake('google');
+    $this->get(route('auth.google.redirect', ['redirect' => '/properties/nice-house']));
+
+    Socialite::fake('google', SocialiteUser::fake([
+        'id' => 'google-subject-8',
+        'name' => 'Redirected Google User',
+        'email' => 'redirected-google@example.com',
+        'email_verified' => true,
+    ]));
+
+    $this->get(route('auth.google.callback'))
+        ->assertRedirect('/properties/nice-house');
+});
+
+test('an off-site Google redirect field is ignored', function () {
+    Socialite::fake('google');
+    $this->get(route('auth.google.redirect', ['redirect' => 'https://evil.example.com']));
+
+    Socialite::fake('google', SocialiteUser::fake([
+        'id' => 'google-subject-9',
+        'name' => 'Safe Google User',
+        'email' => 'safe-google@example.com',
+        'email_verified' => true,
+    ]));
+
+    $this->get(route('auth.google.callback'))
+        ->assertRedirect(route('user.dashboard'));
 });
 
 test('Google authentication preserves invitation context after a failed callback', function () {

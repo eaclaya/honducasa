@@ -18,10 +18,14 @@ import {
     ShieldCheck,
     X,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import AuthModal from '@/components/AuthModal.vue';
 import PropertyDetailMap from '@/components/PropertyDetailMap.vue';
 import PublicHeader from '@/components/PublicHeader.vue';
-import { login } from '@/routes';
+import { Toaster } from '@/components/ui/sonner';
+import { usePendingAuthAction } from '@/composables/usePendingAuthAction';
+import type { PendingAuthAction } from '@/composables/usePendingAuthAction';
+import { createSwipeGesture } from '@/lib/swipeGesture';
 import { store as startConversation } from '@/routes/conversations';
 import { store as favorite, destroy as unfavorite } from '@/routes/favorites';
 import { show as messages } from '@/routes/messages';
@@ -44,10 +48,17 @@ type PropertyDetails = {
     description: string | null;
     priceAmount: number;
     currency: string;
+    originalPriceAmount: number;
+    originalCurrency: string;
+    priceIsConverted: boolean;
     depositAmount: number | null;
     utilitiesIncluded: boolean;
     isFavorited: boolean;
-    publisher: { teamName: string; agentName: string };
+    publisher: {
+        name: string;
+        agentName: string | null;
+        isAgency: boolean;
+    };
     messaging: {
         canMessage: boolean;
         existingConversationId: number | null;
@@ -87,6 +98,36 @@ const page = usePage();
 const locale = computed(() => page.props.locale);
 const tr = (es: string, en: string): string =>
     locale.value === 'es' ? es : en;
+const requestedReturnUrl = new URL(
+    page.url,
+    'http://localhost',
+).searchParams.get('return_to');
+const resultsUrl = computed(() =>
+    requestedReturnUrl?.startsWith('/rentals')
+        ? requestedReturnUrl
+        : rentals.url({
+              query: {
+                  location: props.property.location,
+                  listing_type: props.property.listingType,
+              },
+          }),
+);
+const returnToResults = (event: MouseEvent): void => {
+    if (
+        !requestedReturnUrl?.startsWith('/rentals') ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        window.history.length <= 1
+    ) {
+        return;
+    }
+
+    event.preventDefault();
+    window.history.back();
+};
 const humanize = (value: string): string =>
     value
         .replaceAll('_', ' ')
@@ -98,13 +139,24 @@ const money = (amount: number, currency: string): string =>
         maximumFractionDigits: 0,
     }).format(amount);
 const galleryOpen = ref(false);
+const galleryDialog = ref<HTMLElement | null>(null);
+let galleryTrigger: HTMLElement | null = null;
 const selectedImageIndex = ref(0);
 const selectedImage = computed(
     () => props.property.images[selectedImageIndex.value],
 );
 const openGallery = (index = 0): void => {
+    galleryTrigger =
+        document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
     selectedImageIndex.value = index;
     galleryOpen.value = true;
+    void nextTick(() => galleryDialog.value?.focus());
+};
+const closeGallery = (): void => {
+    galleryOpen.value = false;
+    void nextTick(() => galleryTrigger?.focus());
 };
 const previousImage = (): void => {
     selectedImageIndex.value =
@@ -115,13 +167,95 @@ const nextImage = (): void => {
     selectedImageIndex.value =
         (selectedImageIndex.value + 1) % props.property.images.length;
 };
+const gallerySwipe = createSwipeGesture({
+    onSwipeLeft: nextImage,
+    onSwipeRight: previousImage,
+});
+const handleGalleryKeydown = (event: KeyboardEvent): void => {
+    if (!galleryOpen.value) {
+        return;
+    }
+
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        closeGallery();
+
+        return;
+    }
+
+    if (props.property.images.length < 2) {
+        return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        previousImage();
+    } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        nextImage();
+    }
+};
+
+onMounted(() => window.addEventListener('keydown', handleGalleryKeydown));
+onBeforeUnmount(() =>
+    window.removeEventListener('keydown', handleGalleryKeydown),
+);
 const messageForm = useForm({ body: '' });
-const sendInitialMessage = (): void => {
-    messageForm.post(startConversation.url(props.property.slug));
+const sendInitialMessage = async (): Promise<void> => {
+    if (!page.props.auth.user) {
+        await requireAuth(
+            tr(
+                'Inicia sesión o crea una cuenta para enviar tu mensaje.',
+                'Log in or create an account to send your message.',
+            ),
+            {
+                type: 'start_conversation',
+                payload: {
+                    property_slug: props.property.slug,
+                    body: messageForm.body,
+                },
+            },
+        );
+
+        return;
+    }
+
+    messageForm.post(startConversation.url(props.property.slug), {
+        preserveScroll: true,
+        onSuccess: () => messageForm.reset(),
+    });
+};
+const authModalOpen = ref(false);
+const authModalDescription = ref<string | undefined>(undefined);
+const { remember: rememberPendingAuthAction } = usePendingAuthAction();
+const requireAuth = async (
+    description: string,
+    action?: PendingAuthAction,
+): Promise<void> => {
+    authModalDescription.value = description;
+
+    if (!action) {
+        authModalOpen.value = true;
+
+        return;
+    }
+
+    if (await rememberPendingAuthAction(action, page.url)) {
+        authModalOpen.value = true;
+    }
 };
 const toggleFavorite = (): void => {
     if (!page.props.auth.user) {
-        window.location.href = login.url();
+        requireAuth(
+            tr(
+                'Necesitas una cuenta para guardar esta propiedad.',
+                'You need an account to save this property.',
+            ),
+            {
+                type: 'favorite_property',
+                payload: { property_slug: props.property.slug },
+            },
+        );
 
         return;
     }
@@ -152,30 +286,26 @@ const toggleFavorite = (): void => {
         />
     </Head>
 
-    <div class="min-h-screen bg-[#f8f7f2] text-[#13233a]">
+    <div
+        class="public-site min-h-screen bg-[var(--public-surface)] text-[var(--public-text)]"
+    >
         <PublicHeader />
 
-        <main class="mx-auto max-w-7xl px-5 py-8 sm:px-8">
+        <main class="public-container py-8">
             <Link
-                :href="
-                    rentals.url({
-                        query: {
-                            location: property.location,
-                            listing_type: property.listingType,
-                        },
-                    })
-                "
+                :href="resultsUrl"
                 class="inline-flex items-center gap-2 text-sm font-semibold text-blue-800"
+                @click="returnToResults"
                 ><ArrowLeft class="size-4" />
                 {{ tr('Volver a resultados', 'Back to results') }}</Link
             >
 
             <section
-                class="relative mt-7 grid gap-3 overflow-hidden rounded-[2rem] lg:grid-cols-[1.6fr_1fr]"
+                class="relative mt-7 grid gap-2 overflow-hidden rounded-xl lg:h-[520px] lg:grid-cols-[1.6fr_1fr]"
             >
                 <button
                     type="button"
-                    class="min-h-72 cursor-zoom-in overflow-hidden bg-stone-200 text-left lg:min-h-[520px]"
+                    class="min-h-72 cursor-zoom-in overflow-hidden bg-stone-200 text-left lg:min-h-0"
                     @click="openGallery(0)"
                 >
                     <img
@@ -207,7 +337,7 @@ const toggleFavorite = (): void => {
                 <button
                     v-if="property.images.length"
                     type="button"
-                    class="absolute right-4 bottom-4 flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold shadow-lg transition hover:bg-stone-50"
+                    class="absolute right-4 bottom-4 flex items-center gap-2 rounded-full bg-[var(--public-surface-raised)] px-4 py-2.5 text-sm font-semibold shadow-lg transition hover:bg-[var(--public-surface-hover)]"
                     @click="openGallery(0)"
                 >
                     <Images class="size-4" />
@@ -216,7 +346,7 @@ const toggleFavorite = (): void => {
                 </button>
             </section>
 
-            <div class="mt-10 grid gap-10 lg:grid-cols-[1fr_360px]">
+            <div class="mt-10 grid gap-16 lg:grid-cols-[minmax(0,1fr)_372px]">
                 <div>
                     <div
                         class="flex flex-wrap items-center gap-2 text-sm font-bold"
@@ -365,10 +495,15 @@ const toggleFavorite = (): void => {
                         </h2>
                         <p class="mt-2 text-sm text-stone-500">
                             {{
-                                tr(
-                                    'Protegemos la dirección exacta hasta que contactes al anunciante.',
-                                    'We protect the exact address until you contact the publisher.',
-                                )
+                                property.map.precision === 'exact'
+                                    ? tr(
+                                          'El pin muestra la ubicación exacta proporcionada por el anunciante.',
+                                          'The pin shows the exact location provided by the publisher.',
+                                      )
+                                    : tr(
+                                          'La ubicación exacta permanece oculta; el mapa muestra únicamente la región aproximada.',
+                                          'The exact location remains hidden; the map only shows the approximate region.',
+                                      )
                             }}
                         </p>
                         <PropertyDetailMap
@@ -384,16 +519,31 @@ const toggleFavorite = (): void => {
                 </div>
 
                 <aside class="lg:sticky lg:top-6 lg:self-start">
-                    <div
-                        class="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm"
-                    >
-                        <p class="text-3xl font-semibold text-blue-800">
+                    <div class="public-elevated-card p-6">
+                        <p
+                            class="text-3xl font-semibold text-[var(--public-brand-ink)]"
+                        >
+                            <span v-if="property.priceIsConverted">≈ </span>
                             {{ money(property.priceAmount, property.currency)
                             }}<span
                                 v-if="property.listingType === 'rent'"
                                 class="text-sm font-normal text-stone-500"
                                 >/{{ tr('mes', 'mo') }}</span
                             >
+                        </p>
+                        <p
+                            v-if="property.priceIsConverted"
+                            class="mt-1 text-sm text-stone-500"
+                        >
+                            {{
+                                tr('Precio original', 'Original asking price')
+                            }}:
+                            {{
+                                money(
+                                    property.originalPriceAmount,
+                                    property.originalCurrency,
+                                )
+                            }}
                         </p>
                         <p
                             v-if="property.depositAmount"
@@ -411,9 +561,12 @@ const toggleFavorite = (): void => {
                                 {{ tr('Publicado por', 'Listed by') }}
                             </p>
                             <p class="mt-2 text-lg font-semibold">
-                                {{ property.publisher.teamName }}
+                                {{ property.publisher.name }}
                             </p>
-                            <p class="mt-1 text-sm text-stone-500">
+                            <p
+                                v-if="property.publisher.agentName"
+                                class="mt-1 text-sm text-stone-500"
+                            >
                                 {{ property.publisher.agentName }}
                             </p>
                             <p
@@ -421,10 +574,15 @@ const toggleFavorite = (): void => {
                             >
                                 <ShieldCheck class="size-4" />
                                 {{
-                                    tr(
-                                        'Anunciante de HonduCasa',
-                                        'HonduCasa publisher',
-                                    )
+                                    property.publisher.isAgency
+                                        ? tr(
+                                              'Agencia en HonduCasa',
+                                              'HonduCasa agency',
+                                          )
+                                        : tr(
+                                              'Anunciante individual',
+                                              'Individual publisher',
+                                          )
                                 }}
                             </p>
                         </div>
@@ -435,13 +593,16 @@ const toggleFavorite = (): void => {
                                     property.messaging.existingConversationId,
                                 ).url
                             "
-                            class="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#123b6d] px-5 py-4 font-semibold text-white"
+                            class="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-4 font-semibold text-primary-foreground hover:bg-primary-hover"
                             ><MessageCircle class="size-5" />{{
-                                tr('Abrir conversación', 'Open conversation')
+                                tr('Ver chat', 'View chat')
                             }}</Link
                         >
                         <form
-                            v-else-if="property.messaging.canMessage"
+                            v-else-if="
+                                property.messaging.canMessage ||
+                                !page.props.auth.user
+                            "
                             class="mt-6"
                             @submit.prevent="sendInitialMessage"
                         >
@@ -459,7 +620,7 @@ const toggleFavorite = (): void => {
                                 id="initial-message"
                                 v-model="messageForm.body"
                                 rows="5"
-                                class="mt-2 w-full resize-none rounded-2xl border border-stone-300 bg-stone-50 p-4 text-sm outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+                                class="public-field mt-2 min-h-36 resize-none"
                                 :placeholder="
                                     tr(
                                         'Menciona qué te interesa y cualquier pregunta sobre la propiedad…',
@@ -484,24 +645,13 @@ const toggleFavorite = (): void => {
                             <button
                                 type="submit"
                                 :disabled="messageForm.processing"
-                                class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#123b6d] px-5 py-4 font-semibold text-white disabled:opacity-60"
+                                class="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-4 font-semibold text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
                             >
                                 <MessageCircle class="size-5" />{{
                                     tr('Enviar mensaje', 'Send message')
                                 }}
                             </button>
                         </form>
-                        <Link
-                            v-else-if="!page.props.auth.user"
-                            :href="login.url()"
-                            class="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#123b6d] px-5 py-4 font-semibold text-white"
-                            ><MessageCircle class="size-5" />{{
-                                tr(
-                                    'Inicia sesión para escribir',
-                                    'Log in to message',
-                                )
-                            }}</Link
-                        >
                     </div>
                 </aside>
             </div>
@@ -517,8 +667,14 @@ const toggleFavorite = (): void => {
                     <Link
                         v-for="item in related"
                         :key="item.slug"
-                        :href="propertyShow.url(item.slug)"
-                        class="overflow-hidden rounded-3xl border border-stone-200 bg-white"
+                        :href="
+                            propertyShow.url(item.slug, {
+                                query: {
+                                    return_to: requestedReturnUrl ?? undefined,
+                                },
+                            })
+                        "
+                        class="overflow-hidden rounded-xl bg-[var(--public-surface-raised)]"
                         ><img
                             v-if="item.image"
                             :src="item.image"
@@ -545,7 +701,9 @@ const toggleFavorite = (): void => {
                                     >{{ item.interiorAreaM2 }} m²</span
                                 >
                             </p>
-                            <p class="mt-3 font-semibold text-blue-800">
+                            <p
+                                class="mt-3 font-semibold text-[var(--public-brand-ink)]"
+                            >
                                 {{ money(item.priceAmount, item.currency)
                                 }}<span
                                     v-if="item.listingType === 'rent'"
@@ -562,16 +720,19 @@ const toggleFavorite = (): void => {
         <Teleport to="body">
             <div
                 v-if="galleryOpen && selectedImage"
+                ref="galleryDialog"
                 class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/95 p-4 sm:p-10"
                 role="dialog"
                 aria-modal="true"
+                aria-keyshortcuts="ArrowLeft ArrowRight Escape"
                 :aria-label="tr('Galería de fotos', 'Photo gallery')"
+                tabindex="-1"
             >
                 <button
                     type="button"
                     class="absolute top-5 right-5 grid size-11 place-items-center rounded-full bg-white/10 text-white hover:bg-white/20"
                     :aria-label="tr('Cerrar galería', 'Close gallery')"
-                    @click="galleryOpen = false"
+                    @click="closeGallery"
                 >
                     <X class="size-6" />
                 </button>
@@ -587,7 +748,12 @@ const toggleFavorite = (): void => {
                 <img
                     :src="selectedImage.url"
                     :alt="selectedImage.altText ?? property.name ?? ''"
-                    class="max-h-[82vh] max-w-[88vw] object-contain"
+                    class="max-h-[82vh] max-w-[88vw] cursor-grab touch-pan-y object-contain select-none active:cursor-grabbing"
+                    draggable="false"
+                    @dragstart.prevent
+                    @pointerdown="gallerySwipe.onPointerDown"
+                    @pointerup="gallerySwipe.onPointerUp"
+                    @pointercancel="gallerySwipe.onPointerCancel"
                 />
                 <button
                     v-if="property.images.length > 1"
@@ -598,10 +764,20 @@ const toggleFavorite = (): void => {
                 >
                     <ChevronRight class="size-7" />
                 </button>
-                <p class="absolute bottom-5 text-sm font-semibold text-white">
+                <p
+                    class="absolute bottom-5 text-sm font-semibold text-white"
+                    aria-live="polite"
+                >
                     {{ selectedImageIndex + 1 }} / {{ property.images.length }}
                 </p>
             </div>
         </Teleport>
+
+        <AuthModal
+            v-model:open="authModalOpen"
+            :description="authModalDescription"
+        />
+
+        <Toaster />
     </div>
 </template>

@@ -18,6 +18,7 @@ class CreateTeam
             $team = Team::create([
                 'name' => $name,
                 'is_personal' => $isPersonal,
+                'trial_ends_at' => now()->addDays(30),
             ]);
 
             $membership = $team->memberships()->create([

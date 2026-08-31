@@ -5,6 +5,7 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Notifications\Teams\TeamInvitation as TeamInvitationNotification;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Notification;
 
 test('team invitations can be created', function () {
@@ -31,6 +32,24 @@ test('team invitations can be created', function () {
     ]);
 });
 
+test('the team invitation email is translated into Spanish', function () {
+    App::setLocale('es');
+
+    $owner = User::factory()->create(['name' => 'Ana Owner']);
+    $team = Team::factory()->create(['name' => 'Equipo Demo']);
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'invited_by' => $owner->id,
+    ]);
+
+    $mail = (new TeamInvitationNotification($invitation))->toMail(User::factory()->make());
+
+    expect($mail->subject)->toBe('Has sido invitado a unirte a Equipo Demo')
+        ->and($mail->introLines)->toContain('Ana Owner te ha invitado a unirte al equipo Equipo Demo.')
+        ->and($mail->introLines)->toContain('Inicia sesión y visita tu panel para aceptar o rechazar esta invitación.')
+        ->and($mail->actionText)->toBe('Iniciar sesión');
+});
+
 test('invitation email for existing users uses login route', function () {
     $owner = User::factory()->withPersonalTeam()->create();
     $invitedUser = User::factory()->withPersonalTeam()->create(['email' => 'invited@example.com']);
@@ -47,7 +66,7 @@ test('invitation email for existing users uses login route', function () {
     $mail = (new TeamInvitationNotification($invitation))->toMail($invitedUser);
 
     expect($mail->actionUrl)->toBe(route('login', ['invitation' => $invitation->code]));
-    $this->assertStringContainsString('dashboard', implode(' ', $mail->introLines));
+    $this->assertStringContainsString('panel', implode(' ', $mail->introLines));
 });
 
 test('invitation email for unknown users uses login route', function () {
@@ -65,7 +84,7 @@ test('invitation email for unknown users uses login route', function () {
     $mail = (new TeamInvitationNotification($invitation))->toMail((object) []);
 
     expect($mail->actionUrl)->toBe(route('login', ['invitation' => $invitation->code]));
-    $this->assertStringContainsString('log in', strtolower(implode(' ', $mail->introLines)));
+    $this->assertStringContainsString('inicia sesión', strtolower(implode(' ', $mail->introLines)));
 });
 
 test('team invitations can be created by admins', function () {

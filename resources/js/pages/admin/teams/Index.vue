@@ -3,12 +3,15 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { Building2, MoreVertical, RotateCcw, Search } from '@lucide/vue';
 import { useDebounceFn } from '@vueuse/core';
 import { reactive, ref } from 'vue';
+import CompSubscriptionModal from '@/components/admin/CompSubscriptionModal.vue';
+import ExtendTrialModal from '@/components/admin/ExtendTrialModal.vue';
 import Pagination from '@/components/admin/Pagination.vue';
 import SuspensionModal from '@/components/admin/SuspensionModal.vue';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useInitials } from '@/composables/useInitials';
@@ -17,8 +20,30 @@ import {
     index as teamsIndex,
     restore as restoreTeam,
 } from '@/routes/admin/teams';
+import {
+    cancel as cancelSubscriptionRoute,
+    comp as compSubscriptionRoute,
+} from '@/routes/admin/teams/subscription';
 import { update as updateSuspension } from '@/routes/admin/teams/suspension';
+import { update as updateTrial } from '@/routes/admin/teams/trial';
 
+type PlanOption = {
+    id: number;
+    key: string;
+    ladder: 'individual' | 'agency';
+    name: string;
+};
+type SubscriptionSummary = {
+    state:
+        | 'active'
+        | 'past_due'
+        | 'incomplete'
+        | 'trial'
+        | 'trial_expired'
+        | 'legacy';
+    planName?: string;
+    trialEndsAt?: string;
+};
 type TeamRow = {
     id: number;
     slug: string;
@@ -33,6 +58,7 @@ type TeamRow = {
     suspensionReason: string | null;
     deletedAt: string | null;
     createdAt: string;
+    subscription: SubscriptionSummary;
 };
 type PageLink = { url: string | null; label: string; active: boolean };
 type Paginated<T> = {
@@ -52,6 +78,7 @@ type Filters = {
 
 const props = defineProps<{
     teams: Paginated<TeamRow>;
+    subscriptionPlans: PlanOption[];
     filters: Filters;
 }>();
 
@@ -98,7 +125,41 @@ const restore = (team: TeamRow): void => {
     router.patch(restoreTeam.url(team.slug), {}, { preserveScroll: true });
 };
 
+const cancelSubscription = (team: TeamRow): void => {
+    router.delete(cancelSubscriptionRoute.url(team.slug), {
+        preserveScroll: true,
+    });
+};
+
+const subscriptionLabels: Record<
+    SubscriptionSummary['state'],
+    [string, string]
+> = {
+    active: ['Activa', 'Active'],
+    past_due: ['Pago pendiente', 'Past due'],
+    incomplete: ['Incompleta', 'Incomplete'],
+    trial: ['Prueba', 'Trial'],
+    trial_expired: ['Prueba vencida', 'Trial expired'],
+    legacy: ['Sin seguimiento', 'Not tracked'],
+};
+const subscriptionClasses: Record<SubscriptionSummary['state'], string> = {
+    active: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400',
+    past_due:
+        'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-400',
+    incomplete: 'bg-muted text-muted-foreground',
+    trial: 'bg-accent text-accent-foreground',
+    trial_expired: 'bg-destructive/15 text-destructive',
+    legacy: 'bg-muted text-muted-foreground',
+};
+const subscriptionLabel = (subscription: SubscriptionSummary): string =>
+    tr(...subscriptionLabels[subscription.state]);
+const hasLiveSubscription = (team: TeamRow): boolean =>
+    team.subscription.state === 'active' ||
+    team.subscription.state === 'past_due';
+
 const suspendTarget = ref<TeamRow | null>(null);
+const extendTrialTarget = ref<TeamRow | null>(null);
+const compSubscriptionTarget = ref<TeamRow | null>(null);
 </script>
 
 <template>
@@ -237,6 +298,9 @@ const suspendTarget = ref<TeamRow | null>(null);
                                 {{ tr('Conv.', 'Conv.') }}
                             </th>
                             <th class="px-5 py-3">
+                                {{ tr('Suscripción', 'Subscription') }}
+                            </th>
+                            <th class="px-5 py-3">
                                 {{ tr('Creado', 'Created') }}
                             </th>
                             <th class="px-5 py-3"></th>
@@ -329,6 +393,32 @@ const suspendTarget = ref<TeamRow | null>(null);
                             <td class="px-5 py-3.5 text-center font-medium">
                                 {{ team.conversationsCount }}
                             </td>
+                            <td class="px-5 py-3.5">
+                                <span
+                                    class="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase"
+                                    :class="
+                                        subscriptionClasses[
+                                            team.subscription.state
+                                        ]
+                                    "
+                                    >{{
+                                        subscriptionLabel(team.subscription)
+                                    }}</span
+                                >
+                                <p
+                                    v-if="team.subscription.planName"
+                                    class="mt-0.5 text-xs text-muted-foreground"
+                                >
+                                    {{ team.subscription.planName }}
+                                </p>
+                                <p
+                                    v-else-if="team.subscription.trialEndsAt"
+                                    class="mt-0.5 text-xs text-muted-foreground"
+                                >
+                                    {{ tr('vence', 'ends') }}
+                                    {{ team.subscription.trialEndsAt }}
+                                </p>
+                            </td>
                             <td
                                 class="px-5 py-3.5 whitespace-nowrap text-muted-foreground"
                             >
@@ -383,6 +473,42 @@ const suspendTarget = ref<TeamRow | null>(null);
                                                 )
                                             }}
                                         </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                            @click="extendTrialTarget = team"
+                                        >
+                                            {{
+                                                tr(
+                                                    'Extender prueba',
+                                                    'Extend trial',
+                                                )
+                                            }}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            v-if="!hasLiveSubscription(team)"
+                                            @click="
+                                                compSubscriptionTarget = team
+                                            "
+                                        >
+                                            {{
+                                                tr(
+                                                    'Otorgar plan gratuito',
+                                                    'Comp a plan',
+                                                )
+                                            }}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            v-else
+                                            variant="destructive"
+                                            @click="cancelSubscription(team)"
+                                        >
+                                            {{
+                                                tr(
+                                                    'Cancelar suscripción',
+                                                    'Cancel subscription',
+                                                )
+                                            }}
+                                        </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </td>
@@ -421,6 +547,32 @@ const suspendTarget = ref<TeamRow | null>(null);
             @update:open="
                 (open) => {
                     if (!open) suspendTarget = null;
+                }
+            "
+        />
+
+        <ExtendTrialModal
+            v-if="extendTrialTarget"
+            :open="extendTrialTarget !== null"
+            :name="extendTrialTarget.name"
+            :url="updateTrial.url(extendTrialTarget.slug)"
+            @update:open="
+                (open) => {
+                    if (!open) extendTrialTarget = null;
+                }
+            "
+        />
+
+        <CompSubscriptionModal
+            v-if="compSubscriptionTarget"
+            :open="compSubscriptionTarget !== null"
+            :name="compSubscriptionTarget.name"
+            :is-personal="compSubscriptionTarget.isPersonal"
+            :plans="subscriptionPlans"
+            :url="compSubscriptionRoute.url(compSubscriptionTarget.slug)"
+            @update:open="
+                (open) => {
+                    if (!open) compSubscriptionTarget = null;
                 }
             "
         />

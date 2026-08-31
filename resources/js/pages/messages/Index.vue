@@ -168,7 +168,7 @@ watch(() => props.selected?.messages.length, scrollToLatest);
                                 }}</span
                                 ><span
                                     v-if="conversation.unreadCount"
-                                    class="grid min-w-5 place-items-center rounded-full bg-blue-700 px-1.5 text-xs text-white"
+                                    class="grid min-w-5 place-items-center rounded-full bg-primary px-1.5 text-xs text-primary-foreground"
                                     >{{ conversation.unreadCount }}</span
                                 ></span
                             ></span
@@ -309,7 +309,7 @@ watch(() => props.selected?.messages.length, scrollToLatest);
                             class="max-w-[78%] rounded-2xl px-4 py-3 text-sm"
                             :class="
                                 message.isMine
-                                    ? 'bg-blue-700 text-white'
+                                    ? 'bg-primary text-primary-foreground'
                                     : 'bg-muted'
                             "
                         >
@@ -338,7 +338,7 @@ watch(() => props.selected?.messages.length, scrollToLatest);
                         /><button
                             type="submit"
                             :disabled="form.processing || !form.body.trim()"
-                            class="grid size-12 shrink-0 place-items-center rounded-xl bg-blue-700 text-white disabled:opacity-50"
+                            class="grid size-12 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-50"
                         >
                             <Send class="size-5" />
                         </button>

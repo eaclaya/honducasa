@@ -2,6 +2,9 @@
 
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
+use App\Http\Controllers\Settings\UserBillingController;
+use App\Http\Controllers\Teams\AgencyController;
+use App\Http\Controllers\Teams\TeamBillingController;
 use App\Http\Controllers\Teams\TeamController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Controllers\Teams\TeamMemberController;
@@ -28,9 +31,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
+    Route::get('settings/billing', [UserBillingController::class, 'edit'])->name('billing.edit');
+    Route::post('settings/billing', [UserBillingController::class, 'update'])->name('billing.update');
 
     Route::get('settings/teams', [TeamController::class, 'index'])->name('teams.index');
-    Route::post('settings/teams', [TeamController::class, 'store'])->name('teams.store');
+    Route::get('settings/agencies/create', [AgencyController::class, 'create'])->name('agencies.create');
+    Route::post('settings/agencies', [AgencyController::class, 'store'])->name('agencies.store');
+    Route::post('settings/teams/personal/switch', [TeamController::class, 'switchToPersonal'])->name('teams.personal.switch');
 
     Route::middleware(EnsureTeamMembership::class)->group(function () {
         Route::get('settings/teams/{team}', [TeamController::class, 'edit'])->name('teams.edit');
@@ -38,6 +45,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('settings/teams/{team}', [TeamController::class, 'destroy'])->name('teams.destroy');
         Route::post('settings/teams/{team}/switch', [TeamController::class, 'switch'])->name('teams.switch');
         Route::delete('settings/teams/{team}/leave', [TeamController::class, 'leave'])->name('teams.leave');
+
+        Route::get('settings/teams/{team}/billing', [TeamBillingController::class, 'edit'])->name('teams.billing.edit');
+        Route::post('settings/teams/{team}/billing', [TeamBillingController::class, 'update'])->name('teams.billing.update');
 
         Route::patch('settings/teams/{team}/members/{user}', [TeamMemberController::class, 'update'])->name('teams.members.update');
         Route::delete('settings/teams/{team}/members/{user}', [TeamMemberController::class, 'destroy'])->name('teams.members.destroy');

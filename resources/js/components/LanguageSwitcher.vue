@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { router, usePage } from '@inertiajs/vue3';
-import { Languages } from '@lucide/vue';
 import { computed } from 'vue';
 import { update } from '@/routes/locale';
 
@@ -14,29 +13,55 @@ const switchLocale = (nextLocale: 'es' | 'en'): void => {
 
     router.post(update.url(nextLocale), {}, { preserveScroll: true });
 };
+
+const toggleLocale = (): void => {
+    switchLocale(locale.value === 'es' ? 'en' : 'es');
+};
+
+const handleKeydown = (event: KeyboardEvent): void => {
+    if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        switchLocale('es');
+    } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        switchLocale('en');
+    }
+};
 </script>
 
 <template>
     <div
-        class="flex items-center gap-1 rounded-full border border-current/20 p-1 text-xs font-bold"
-        aria-label="Language"
+        class="flex items-center text-xs font-bold"
+        :aria-label="locale === 'es' ? 'Idioma: español' : 'Language: English'"
     >
-        <Languages class="ml-1 size-3.5 opacity-70" />
         <button
             type="button"
-            class="rounded-full px-2 py-1"
-            :class="locale === 'es' ? 'bg-current/15' : 'opacity-60'"
-            @click="switchLocale('es')"
+            role="switch"
+            :aria-checked="locale === 'en'"
+            :aria-label="
+                locale === 'es'
+                    ? 'Cambiar idioma a inglés'
+                    : 'Switch language to Spanish'
+            "
+            class="relative grid h-10 w-[5.5rem] grid-cols-2 items-center rounded-full border border-current/25 p-1 transition focus-visible:ring-2 focus-visible:ring-current/40 focus-visible:ring-offset-2 focus-visible:outline-none"
+            @click="toggleLocale"
+            @keydown="handleKeydown"
         >
-            ES
-        </button>
-        <button
-            type="button"
-            class="rounded-full px-2 py-1"
-            :class="locale === 'en' ? 'bg-current/15' : 'opacity-60'"
-            @click="switchLocale('en')"
-        >
-            EN
+            <span
+                class="absolute inset-y-1 left-1 w-9 rounded-full bg-primary shadow-sm transition-transform duration-200 ease-out"
+                :class="locale === 'en' ? 'translate-x-10' : 'translate-x-0'"
+                aria-hidden="true"
+            />
+            <span
+                class="relative z-10 transition-opacity"
+                :class="locale === 'es' ? 'opacity-100' : 'opacity-55'"
+                >ES</span
+            >
+            <span
+                class="relative z-10 transition-opacity"
+                :class="locale === 'en' ? 'opacity-100' : 'opacity-55'"
+                >EN</span
+            >
         </button>
     </div>
 </template>

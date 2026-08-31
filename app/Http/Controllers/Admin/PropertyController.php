@@ -27,7 +27,7 @@ class PropertyController extends Controller
         $noPhotos = $request->boolean('no_photos');
 
         $properties = Property::query()
-            ->with(['team:id,name,slug', 'location:id,name'])
+            ->with(['team:id,name,slug', 'creator:id,name', 'location:id,name'])
             ->withCount(['media as photos_count' => fn (Builder $query) => $query->where('collection_name', 'photos')])
             ->when($search, fn (Builder $query, string $search) => $query->where(
                 fn (Builder $q) => $q->where('name', 'like', "%{$search}%")
@@ -52,8 +52,8 @@ class PropertyController extends Controller
                 'priceAmount' => $property->price_amount,
                 'currency' => $property->currency,
                 'photosCount' => $property->photos_count,
-                'teamName' => $property->team->name,
-                'teamSlug' => $property->team->slug,
+                'teamName' => $property->team?->name ?? $property->creator->name,
+                'teamSlug' => $property->team?->slug,
                 'locationName' => $property->location->name,
                 'publishedAt' => $property->published_at?->translatedFormat('d M Y'),
                 'createdAt' => $property->created_at->translatedFormat('d M Y'),

@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { Check, ChevronsUpDown, Plus, Users } from '@lucide/vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import CreateTeamModal from '@/components/CreateTeamModal.vue';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -12,7 +11,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { create as createAgency } from '@/routes/agencies';
 import { switchMethod } from '@/routes/teams';
+import { switchMethod as switchToPersonal } from '@/routes/teams/personal';
 import type { Team } from '@/types';
 
 const props = withDefaults(
@@ -49,6 +50,8 @@ const checkIconClass = computed(() =>
     props.inHeader ? 'ml-auto size-4' : 'ml-auto h-4 w-4',
 );
 const plusIconClass = computed(() => (props.inHeader ? 'size-4' : 'h-4 w-4'));
+const teamLabel = (team: Team): string =>
+    team.isPersonal ? tr('Cuenta personal', 'Personal account') : team.name;
 
 const switchTeam = (team: Team) => {
     const previousTeamSlug = currentTeam.value?.slug;
@@ -122,7 +125,7 @@ onUnmounted(() => {
                         "
                     >
                         {{
-                            currentTeam?.name ??
+                            (currentTeam && teamLabel(currentTeam)) ??
                             tr('Seleccionar equipo', 'Select team')
                         }}
                     </span>
@@ -144,8 +147,16 @@ onUnmounted(() => {
             :side-offset="props.inHeader ? undefined : 4"
         >
             <DropdownMenuLabel class="text-xs text-muted-foreground">
-                {{ tr('Equipos', 'Teams') }}
+                {{ tr('Espacios de trabajo', 'Workspaces') }}
             </DropdownMenuLabel>
+            <DropdownMenuItem
+                data-test="personal-workspace-switcher-item"
+                :class="teamItemClass"
+                @click="router.visit(switchToPersonal())"
+            >
+                {{ tr('Cuenta personal', 'Personal account') }}
+                <Check v-if="!currentTeam" :class="checkIconClass" />
+            </DropdownMenuItem>
             <DropdownMenuItem
                 v-for="team in teams"
                 :key="team.id"
@@ -153,25 +164,25 @@ onUnmounted(() => {
                 :class="teamItemClass"
                 @click="switchTeam(team)"
             >
-                {{ team.name }}
+                {{ teamLabel(team) }}
                 <Check
                     v-if="currentTeam?.id === team.id"
                     :class="checkIconClass"
                 />
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <CreateTeamModal>
-                <DropdownMenuItem
-                    data-test="team-switcher-new-team"
-                    :class="teamItemClass"
-                    @select.prevent
-                >
+            <DropdownMenuItem
+                data-test="team-switcher-new-team"
+                :class="teamItemClass"
+                as-child
+            >
+                <Link :href="createAgency()">
                     <Plus :class="plusIconClass" />
                     <span class="text-muted-foreground">{{
-                        tr('Nuevo equipo', 'New team')
+                        tr('Crear una agencia', 'Create an agency')
                     }}</span>
-                </DropdownMenuItem>
-            </CreateTeamModal>
+                </Link>
+            </DropdownMenuItem>
         </DropdownMenuContent>
     </DropdownMenu>
 </template>

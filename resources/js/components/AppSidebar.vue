@@ -3,13 +3,14 @@ import { Link, usePage } from '@inertiajs/vue3';
 import {
     Bell,
     Building2,
-    Compass,
+    CreditCard,
     Heart,
     Home,
     LayoutGrid,
     MessageCircle,
     Search,
     ShieldAlert,
+    ShieldBan,
     Users,
 } from '@lucide/vue';
 import { computed } from 'vue';
@@ -27,15 +28,17 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard, home } from '@/routes';
+import { index as blacklist } from '@/routes/admin/blacklist';
 import { index as moderation } from '@/routes/admin/moderation';
 import { index as adminProperties } from '@/routes/admin/properties';
+import { index as subscriptionPlans } from '@/routes/admin/subscription-plans';
 import { index as adminTeams } from '@/routes/admin/teams';
 import { index as adminUsers } from '@/routes/admin/users';
 import { index as favorites } from '@/routes/favorites';
 import { index as listings } from '@/routes/listings';
 import { show as messages } from '@/routes/messages';
 import { index as notifications } from '@/routes/notifications';
-import { index as rentals } from '@/routes/rentals';
+import { index as personalListings } from '@/routes/personal-listings';
 import { index as savedSearches } from '@/routes/saved-searches';
 import { dashboard as userDashboard } from '@/routes/user';
 import type { NavItem } from '@/types';
@@ -48,7 +51,9 @@ const dashboardUrl = computed(() =>
         : userDashboard().url,
 );
 
-const hasTeams = computed(() => page.props.teams.length > 0);
+const hasAgencies = computed(() =>
+    page.props.teams.some((team) => !team.isPersonal),
+);
 
 const mainNavItems = computed<NavItem[]>(() => [
     {
@@ -57,25 +62,12 @@ const mainNavItems = computed<NavItem[]>(() => [
         icon: LayoutGrid,
     },
     {
-        title:
-            page.props.locale === 'es'
-                ? 'Explorar propiedades'
-                : 'Explore properties',
-        href: rentals().url,
-        icon: Compass,
+        title: page.props.locale === 'es' ? 'Mis propiedades' : 'My listings',
+        href: page.props.currentTeam
+            ? listings.url(page.props.currentTeam.slug)
+            : personalListings().url,
+        icon: Building2,
     },
-    ...(page.props.currentTeam
-        ? [
-              {
-                  title:
-                      page.props.locale === 'es'
-                          ? 'Mis propiedades'
-                          : 'My listings',
-                  href: listings.url(page.props.currentTeam.slug),
-                  icon: Building2,
-              },
-          ]
-        : []),
     {
         title: page.props.locale === 'es' ? 'Favoritos' : 'Favorites',
         href: favorites().url,
@@ -130,6 +122,20 @@ const adminNavItems = computed<NavItem[]>(() =>
                   href: moderation().url,
                   icon: ShieldAlert,
               },
+              {
+                  title:
+                      page.props.locale === 'es' ? 'Lista negra' : 'Blacklist',
+                  href: blacklist().url,
+                  icon: ShieldBan,
+              },
+              {
+                  title:
+                      page.props.locale === 'es'
+                          ? 'Planes de suscripción'
+                          : 'Subscription plans',
+                  href: subscriptionPlans().url,
+                  icon: CreditCard,
+              },
           ]
         : [],
 );
@@ -147,7 +153,7 @@ const adminNavItems = computed<NavItem[]>(() =>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             </SidebarMenu>
-            <SidebarMenu v-if="hasTeams">
+            <SidebarMenu v-if="hasAgencies">
                 <SidebarMenuItem>
                     <TeamSwitcher />
                 </SidebarMenuItem>

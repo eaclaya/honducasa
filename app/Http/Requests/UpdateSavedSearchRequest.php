@@ -15,6 +15,14 @@ class UpdateSavedSearchRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['name' => ['sometimes', 'string', 'max:100'], 'alerts_enabled' => ['sometimes', 'boolean']];
+        $filterRules = StoreSavedSearchRequest::creationRules();
+        unset($filterRules['name'], $filterRules['alerts_enabled']);
+        $filterRules['filters'] = ['sometimes', 'array'];
+
+        return [
+            'name' => ['sometimes', 'string', 'max:100'],
+            'alerts_enabled' => ['sometimes', 'boolean'],
+            ...$filterRules,
+        ];
     }
 }

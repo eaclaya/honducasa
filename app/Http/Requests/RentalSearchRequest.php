@@ -30,7 +30,7 @@ class RentalSearchRequest extends FormRequest
             'location' => ['nullable', 'string', 'max:100'],
             'property_type' => ['nullable', Rule::enum(PropertyType::class)],
             'listing_type' => ['nullable', Rule::enum(ListingType::class)],
-            'currency' => ['nullable', Rule::in(['HNL', 'USD'])],
+            'currency' => ['nullable', Rule::in(array_keys(config('currencies.supported', [])))],
             'min_price' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
             'max_price' => ['nullable', 'integer', 'gte:min_price', 'max:1000000000'],
             'bedrooms' => ['nullable', 'integer', 'between:0,20'],
@@ -47,6 +47,7 @@ class RentalSearchRequest extends FormRequest
             'north' => ['nullable', 'required_with:west,south,east', 'numeric', 'between:12.9,16.6'],
             'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:-180,180'],
+            'saved_search' => ['nullable', 'integer', 'min:1'],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
     }

@@ -9,7 +9,7 @@ class PropertyPolicy
 {
     public function view(User $user, Property $property): bool
     {
-        return $user->teams()->whereKey($property->team_id)->exists();
+        return $property->isOwnedBy($user);
     }
 
     public function update(User $user, Property $property): bool

@@ -11,6 +11,7 @@ use App\Enums\PropertyType;
 use App\Models\Location;
 use App\Models\Property;
 use App\Models\User;
+use App\Support\CurrencyConverter;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,8 @@ class DemoPropertySeeder extends Seeder
     public const int PROPERTY_COUNT = 10_000;
 
     private const int INSERT_CHUNK_SIZE = 500;
+
+    public function __construct(private CurrencyConverter $currencyConverter) {}
 
     /** @var list<string> */
     private const array IMAGE_URLS = [
@@ -94,6 +97,10 @@ class DemoPropertySeeder extends Seeder
                     $type = fake()->randomElement(PropertyType::cases());
                     $listingType = fake()->boolean(78) ? ListingType::Rent : ListingType::Buy;
                     $pricing = $this->listingPricing($market['city'], $type, $listingType);
+                    $normalizedPricing = $this->currencyConverter->normalizationAttributes(
+                        $pricing['price_amount'],
+                        $pricing['currency'],
+                    );
                     $name = fake()->randomElement(['Casa', 'Apartamento', 'Residencia', 'Condominio', 'Estudio']).' '.fake()->streetName();
                     $timestamp = now();
 
@@ -120,6 +127,7 @@ class DemoPropertySeeder extends Seeder
                         'furnishing' => fake()->randomElement(Furnishing::cases())->value,
                         'price_amount' => $pricing['price_amount'],
                         'currency' => $pricing['currency'],
+                        ...$normalizedPricing,
                         'deposit_amount' => $listingType === ListingType::Rent && fake()->boolean(85) ? $pricing['price_amount'] : null,
                         'utilities_included' => $listingType === ListingType::Rent && fake()->boolean(18),
                         'description' => fake()->paragraphs(2, true),

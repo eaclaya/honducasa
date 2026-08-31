@@ -16,7 +16,7 @@ class ModerationController extends Controller
     {
         $reports = ConversationReport::query()
             ->select(['id', 'conversation_id', 'reporter_id', 'reason', 'details', 'status', 'created_at'])
-            ->with(['reporter:id,name', 'conversation:id,property_id,team_id,renter_id,status', 'conversation.property:id,name,slug', 'conversation.team:id,name', 'conversation.renter:id,name'])
+            ->with(['reporter:id,name', 'conversation:id,property_id,team_id,renter_id,status', 'conversation.property:id,name,slug,created_by,team_id', 'conversation.property.creator:id,name', 'conversation.team:id,name', 'conversation.renter:id,name'])
             ->latest()
             ->paginate(30)
             ->withQueryString()
@@ -30,7 +30,7 @@ class ModerationController extends Controller
                 'conversationId' => $report->conversation_id,
                 'conversationStatus' => $report->conversation->status->value,
                 'propertyName' => $report->conversation->property->name,
-                'teamName' => $report->conversation->team->name,
+                'teamName' => $report->conversation->team?->name ?? $report->conversation->property->creator->name,
                 'renterName' => $report->conversation->renter->name,
             ]);
 

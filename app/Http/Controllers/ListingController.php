@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Actions\Teams\CreateTeam;
+use App\Actions\Listings\SetListingStatus;
 use App\Data\GeoPoint;
 use App\Enums\ApproximateLocationShape;
 use App\Enums\ListingStatus;
@@ -11,6 +11,7 @@ use App\Http\Requests\SaveListingRequest;
 use App\Models\Location;
 use App\Models\Property;
 use App\Models\Team;
+use App\Support\CurrencyConverter;
 use App\Support\NearestCity;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -24,12 +25,15 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class ListingController extends Controller
 {
-    public function __construct(private readonly CreateTeam $createTeam) {}
+    public function __construct(private CurrencyConverter $currencyConverter) {}
 
-    public function index(Team $currentTeam): Response
+    public function index(Request $request, ?Team $currentTeam = null): Response
     {
+        $listings = $currentTeam?->properties()
+            ?? $request->user()->createdProperties()->whereNull('team_id');
+
         return Inertia::render('listings/Index', [
-            'listings' => $currentTeam->properties()->with('media')->latest('id')->get()->map(fn (Property $property) => [
+            'listings' => $listings->with('media')->latest('id')->get()->map(fn (Property $property) => [
                 'id' => $property->id, 'slug' => $property->slug, 'name' => $property->name,
                 'status' => $property->status->value, 'listingType' => $property->listing_type->value,
                 'priceAmount' => $property->price_amount, 'currency' => $property->currency,
@@ -45,50 +49,69 @@ class ListingController extends Controller
      * publishers, via the `listings.start` route) — no team is created here, only
      * when the listing is actually saved, so an abandoned wizard leaves nothing behind.
      */
-    public function create(Request $request): Response|RedirectResponse
+    public function create(Request $request, ?Team $currentTeam = null): Response|RedirectResponse
     {
-        if ($request->route('current_team') === null && $request->user()->currentTeam) {
-            return to_route('listings.create', ['current_team' => $request->user()->currentTeam->slug]);
-        }
-
         return Inertia::render('listings/Form', [
             'listing' => null,
             'locations' => $this->locations(),
+            'currencies' => $this->currencyConverter->supportedCurrencies(),
             'oldInput' => $request->old(),
         ]);
     }
 
     /**
-     * Save the listing, creating the user's team in the same transaction if they don't have one yet.
+     * Save an individual listing or an agency-owned listing when a team is scoped.
      */
     public function store(SaveListingRequest $request, ?Team $currentTeam = null): RedirectResponse
     {
-        $team = null;
+        $requestedStatus = $request->enum('status', ListingStatus::class);
+        $savedStatus = ListingStatus::Draft;
 
-        $property = DB::transaction(function () use ($request, $currentTeam, &$team): Property {
-            $team = $currentTeam
-                ?? $request->user()->currentTeam
-                ?? $this->createTeam->handle($request->user(), "{$request->user()->name}'s Team", isPersonal: true);
+        DB::transaction(function () use ($request, $currentTeam, $requestedStatus, &$savedStatus): void {
+            if ($currentTeam === null && $request->user()->individual_trial_ends_at === null) {
+                $request->user()->update(['individual_trial_ends_at' => now()->addDays(30)]);
+            }
 
-            $property = $team->properties()->make($this->attributes($request) + [
+            $property = Property::query()->make($this->attributes($request) + [
+                'team_id' => $currentTeam?->id,
                 'created_by' => $request->user()->getKey(),
                 'slug' => Str::slug($request->string('name')).'-'.Str::lower(Str::random(8)),
+                'status' => ListingStatus::Draft,
+                'published_at' => null,
             ]);
             $property->setAttribute('coordinates', $this->coordinates($request)->toPostgisPoint());
             $property->save();
             $this->syncImages($property, $request);
-
-            return $property;
+            $savedStatus = app(SetListingStatus::class)->handle($property, $requestedStatus);
         });
 
-        return to_route('listings.index', $team)
+        if ($requestedStatus === ListingStatus::Published && $savedStatus !== ListingStatus::Published) {
+            return $currentTeam === null
+                ? to_route('billing.edit')->with('toast', [
+                    'type' => 'warning',
+                    'message' => __('You reached your active listing limit. Your property was saved as a draft. Choose a plan to publish it.'),
+                ])
+                : $this->redirectToBilling($currentTeam);
+        }
+
+        return to_route($currentTeam === null ? 'personal-listings.index' : 'listings.index', $currentTeam === null ? [] : $currentTeam)
             ->with('toast', ['type' => 'success', 'message' => 'Property saved successfully.']);
     }
 
     public function edit(Request $request, Team $currentTeam, Property $listing): Response
     {
+        return $this->renderEdit($request, $listing, $currentTeam);
+    }
+
+    public function editPersonal(Request $request, Property $listing): Response
+    {
+        return $this->renderEdit($request, $listing);
+    }
+
+    private function renderEdit(Request $request, Property $listing, ?Team $currentTeam = null): Response
+    {
         Gate::authorize('update', $listing);
-        abort_unless($listing->team_id === $currentTeam->id, 404);
+        $this->ensureRouteOwnership($request, $listing, $currentTeam);
         $point = DB::table('properties')->where('id', $listing->id)->selectRaw('ST_Y(coordinates::geometry) latitude, ST_X(coordinates::geometry) longitude')->first();
 
         return Inertia::render('listings/Form', [
@@ -105,30 +128,64 @@ class ListingController extends Controller
                 ])->values(),
             ],
             'locations' => $this->locations(),
+            'currencies' => $this->currencyConverter->supportedCurrencies(),
             'oldInput' => $request->old(),
         ]);
     }
 
     public function update(SaveListingRequest $request, Team $currentTeam, Property $listing): RedirectResponse
     {
+        return $this->updateListing($request, $listing, $currentTeam);
+    }
+
+    public function updatePersonal(SaveListingRequest $request, Property $listing): RedirectResponse
+    {
+        return $this->updateListing($request, $listing);
+    }
+
+    private function updateListing(SaveListingRequest $request, Property $listing, ?Team $currentTeam = null): RedirectResponse
+    {
         Gate::authorize('update', $listing);
-        abort_unless($listing->team_id === $currentTeam->id, 404);
-        DB::transaction(function () use ($request, $listing): void {
+        $this->ensureRouteOwnership($request, $listing, $currentTeam);
+        $requestedStatus = $request->enum('status', ListingStatus::class);
+        $savedStatus = ListingStatus::Draft;
+
+        DB::transaction(function () use ($request, $listing, $requestedStatus, &$savedStatus): void {
             $listing->update($this->attributes($request));
             $this->setCoordinates($listing, $request);
             $this->syncImages($listing, $request);
+            $savedStatus = app(SetListingStatus::class)->handle($listing, $requestedStatus);
         });
+
+        if ($requestedStatus === ListingStatus::Published && $savedStatus !== ListingStatus::Published) {
+            return $currentTeam === null
+                ? back()->with('toast', [
+                    'type' => 'warning',
+                    'message' => __('You reached your active listing limit. Your property was saved as a draft.'),
+                ])
+                : $this->redirectToBilling($currentTeam);
+        }
 
         return back()->with('toast', ['type' => 'success', 'message' => 'Listing updated.']);
     }
 
-    public function destroy(Team $currentTeam, Property $listing): RedirectResponse
+    public function destroy(Request $request, Team $currentTeam, Property $listing): RedirectResponse
+    {
+        return $this->destroyListing($request, $listing, $currentTeam);
+    }
+
+    public function destroyPersonal(Request $request, Property $listing): RedirectResponse
+    {
+        return $this->destroyListing($request, $listing);
+    }
+
+    private function destroyListing(Request $request, Property $listing, ?Team $currentTeam = null): RedirectResponse
     {
         Gate::authorize('delete', $listing);
-        abort_unless($listing->team_id === $currentTeam->id, 404);
+        $this->ensureRouteOwnership($request, $listing, $currentTeam);
         $listing->delete();
 
-        return to_route('listings.index', $currentTeam);
+        return to_route($currentTeam === null ? 'personal-listings.index' : 'listings.index', $currentTeam === null ? [] : $currentTeam);
     }
 
     /** @return array<string, mixed> */
@@ -140,9 +197,13 @@ class ListingController extends Controller
             'location_mode',
             'approximate_radius_km',
             'images',
+            'status',
         ]);
-        $attributes['published_at'] = $request->enum('status', ListingStatus::class) === ListingStatus::Published ? now() : null;
         $attributes['public_location_precision'] = $request->enum('location_mode', LocationPrecision::class);
+        $attributes += $this->currencyConverter->normalizationAttributes(
+            $request->integer('price_amount'),
+            $request->string('currency')->toString(),
+        );
 
         if ($attributes['public_location_precision'] === LocationPrecision::Exact) {
             $attributes['approximate_shape'] = null;
@@ -161,6 +222,25 @@ class ListingController extends Controller
             : null;
 
         return $attributes;
+    }
+
+    private function redirectToBilling(Team $team): RedirectResponse
+    {
+        return to_route('teams.billing.edit', $team)
+            ->with('toast', [
+                'type' => 'warning',
+                'message' => __('You reached your active listing limit. Your property was saved as a draft. Choose a plan to publish it.'),
+            ]);
+    }
+
+    private function ensureRouteOwnership(Request $request, Property $listing, ?Team $currentTeam): void
+    {
+        abort_unless(
+            $currentTeam === null
+                ? $listing->team_id === null && $listing->created_by === $request->user()->id
+                : $listing->team_id === $currentTeam->id,
+            404,
+        );
     }
 
     private function setCoordinates(Property $property, SaveListingRequest $request): void

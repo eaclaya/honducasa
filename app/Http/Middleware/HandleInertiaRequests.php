@@ -45,6 +45,9 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user,
             ],
+            'googleOneTap' => [
+                'clientId' => $user === null ? config('services.google.client_id') : null,
+            ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'currentTeam' => fn () => $user?->currentTeam ? $user->toUserTeam($user->currentTeam) : null,
             'teams' => fn () => $user?->toUserTeams(includeCurrent: true) ?? [],
@@ -53,7 +56,8 @@ class HandleInertiaRequests extends Middleware
                 ->where('sender_id', '!=', $user->id)
                 ->whereHas('conversation', fn ($query) => $query
                     ->where('renter_id', $user->id)
-                    ->orWhereIn('team_id', $user->teams()->select('teams.id')))
+                    ->orWhereIn('team_id', $user->teams()->select('teams.id'))
+                    ->orWhereHas('property', fn ($property) => $property->whereNull('team_id')->where('created_by', $user->id)))
                 ->count() : 0,
             'unreadNotifications' => fn () => $user?->unreadNotifications()->count() ?? 0,
         ];

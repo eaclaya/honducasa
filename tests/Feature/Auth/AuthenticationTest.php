@@ -63,6 +63,45 @@ test('team-less users land on the user dashboard after login', function () {
     $response->assertRedirect('/dashboard');
 });
 
+test('a login carrying a redirect field returns there instead of the team dashboard', function () {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+        'redirect' => '/properties/nice-house',
+    ]);
+
+    $this->assertAuthenticated();
+    $response->assertRedirect('/properties/nice-house');
+});
+
+test('a login redirect field pointing off-site is ignored', function () {
+    $user = User::factory()->create();
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+        'redirect' => 'https://evil.example.com',
+    ]);
+
+    $this->assertAuthenticated();
+    $response->assertRedirect('/dashboard');
+});
+
+test('a login redirect field using a protocol-relative URL is ignored', function () {
+    $user = User::factory()->create();
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+        'redirect' => '//evil.example.com',
+    ]);
+
+    $this->assertAuthenticated();
+    $response->assertRedirect('/dashboard');
+});
+
 test('passkey login response redirects to the current team dashboard', function () {
     $user = User::factory()->withPersonalTeam()->create();
 

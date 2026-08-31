@@ -1,30 +1,34 @@
 <script setup lang="ts">
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage, useRemember } from '@inertiajs/vue3';
 import {
-    Bath,
     BedDouble,
     Building2,
-    Car,
     ChevronDown,
+    CircleDollarSign,
     Filter,
-    House,
     Heart,
     List,
     Map as MapIcon,
-    Maximize2,
     Search,
     SlidersHorizontal,
     X,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, reactive, ref, toRefs } from 'vue';
+import AuthModal from '@/components/AuthModal.vue';
 import LocationTypeahead from '@/components/LocationTypeahead.vue';
 import PropertyResultsMap from '@/components/PropertyResultsMap.vue';
 import PublicHeader from '@/components/PublicHeader.vue';
-import { login } from '@/routes';
+import PublicPropertyCard from '@/components/PublicPropertyCard.vue';
+import SavedSearchRefinementModal from '@/components/SavedSearchRefinementModal.vue';
+import { Toaster } from '@/components/ui/sonner';
+import { usePendingAuthAction } from '@/composables/usePendingAuthAction';
+import type { PendingAuthAction } from '@/composables/usePendingAuthAction';
 import { store as favorite, destroy as unfavorite } from '@/routes/favorites';
-import { show as propertyShow } from '@/routes/properties';
 import { index as rentals } from '@/routes/rentals';
-import { store as saveSearchRoute } from '@/routes/saved-searches';
+import {
+    store as saveSearchRoute,
+    update as updateSavedSearchRoute,
+} from '@/routes/saved-searches';
 
 type Rental = {
     id: number;
@@ -40,11 +44,13 @@ type Rental = {
     furnishing: string;
     priceAmount: number;
     currency: string;
+    priceIsConverted: boolean;
     depositAmount: number | null;
     utilitiesIncluded: boolean;
     mapLatitude: number;
     mapLongitude: number;
     primaryImage: { url: string; altText: string | null } | null;
+    images: Array<{ url: string; altText: string | null }>;
     isFavorited: boolean;
 };
 
@@ -77,6 +83,26 @@ type AdvancedFilterKey =
     | 'furnishing'
     | 'utilitiesIncluded';
 
+type RentalResultsContext = {
+    location: string;
+    nearbyLatitude: number | null;
+    nearbyLongitude: number | null;
+    propertyType: string;
+    listingType: string;
+    currency: string;
+    minPrice: string;
+    maxPrice: string;
+    bedrooms: string;
+    bathrooms: string;
+    parkingSpaces: string;
+    minArea: string;
+    maxArea: string;
+    furnishing: string;
+    utilitiesIncluded: string;
+    sort: string;
+    showMap: boolean;
+};
+
 const props = defineProps<{
     filters: {
         location: string;
@@ -102,36 +128,81 @@ const props = defineProps<{
         radiusMeters: number | null;
     };
     properties: PaginatedRentals;
+    currencies: string[];
+    baseCurrency: string;
+    isSearchSaved: boolean;
+    savedSearch: {
+        id: number;
+        name: string;
+        hasChanges: boolean;
+    } | null;
 }>();
 
 const page = usePage();
 const locale = computed(() => page.props.locale);
 const tr = (es: string, en: string): string =>
     locale.value === 'es' ? es : en;
-const location = ref(props.filters.location);
-const nearbyLatitude = ref(props.filters.latitude);
-const nearbyLongitude = ref(props.filters.longitude);
-const propertyType = ref(props.filters.propertyType);
-const listingType = ref(props.filters.listingType);
-const currency = ref(props.filters.currency);
-const minPrice = ref(props.filters.minPrice);
-const maxPrice = ref(props.filters.maxPrice);
-const bedrooms = ref(props.filters.bedrooms);
-const bathrooms = ref(props.filters.bathrooms);
-const parkingSpaces = ref(props.filters.parkingSpaces);
-const minArea = ref(props.filters.minArea);
-const maxArea = ref(props.filters.maxArea);
-const furnishing = ref(props.filters.furnishing);
-const utilitiesIncluded = ref(
-    props.filters.utilitiesIncluded === null
-        ? ''
-        : props.filters.utilitiesIncluded
-          ? '1'
-          : '0',
-);
-const sort = ref(props.filters.sort);
-const showMap = ref(false);
+const pageUrl = new URL(page.url, 'http://localhost');
+const rememberedContext = useRemember(
+    reactive<RentalResultsContext>({
+        location: props.filters.location,
+        nearbyLatitude: props.filters.latitude,
+        nearbyLongitude: props.filters.longitude,
+        propertyType: props.filters.propertyType,
+        listingType: props.filters.listingType,
+        currency: props.filters.currency,
+        minPrice: props.filters.minPrice,
+        maxPrice: props.filters.maxPrice,
+        bedrooms: props.filters.bedrooms,
+        bathrooms: props.filters.bathrooms,
+        parkingSpaces: props.filters.parkingSpaces,
+        minArea: props.filters.minArea,
+        maxArea: props.filters.maxArea,
+        furnishing: props.filters.furnishing,
+        utilitiesIncluded:
+            props.filters.utilitiesIncluded === null
+                ? ''
+                : props.filters.utilitiesIncluded
+                  ? '1'
+                  : '0',
+        sort: props.filters.sort,
+        showMap: pageUrl.searchParams.get('view') === 'map',
+    }),
+    'rentals.results',
+) as RentalResultsContext;
+const {
+    location,
+    nearbyLatitude,
+    nearbyLongitude,
+    propertyType,
+    listingType,
+    currency,
+    minPrice,
+    maxPrice,
+    bedrooms,
+    bathrooms,
+    parkingSpaces,
+    minArea,
+    maxArea,
+    furnishing,
+    utilitiesIncluded,
+    sort,
+    showMap,
+} = toRefs(rememberedContext);
+const resultsContextUrl = computed(() => {
+    const url = new URL(page.url, 'http://localhost');
+
+    if (showMap.value) {
+        url.searchParams.set('view', 'map');
+    } else {
+        url.searchParams.delete('view');
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+});
 const showFilters = ref(false);
+const savingSearch = ref(false);
+const refinementModalOpen = ref(false);
 const nearbyActive = computed(
     () => nearbyLatitude.value !== null && nearbyLongitude.value !== null,
 );
@@ -139,35 +210,121 @@ const clearNearbySearch = (): void => {
     nearbyLatitude.value = null;
     nearbyLongitude.value = null;
 };
-const saveSearch = (): void => {
-    if (!page.props.auth.user) {
-        router.visit(login.url());
+const authModalOpen = ref(false);
+const authModalDescription = ref<string | undefined>(undefined);
+const { remember: rememberPendingAuthAction } = usePendingAuthAction();
+const requireAuth = async (
+    description: string,
+    action?: PendingAuthAction,
+): Promise<void> => {
+    authModalDescription.value = description;
+
+    if (!action) {
+        authModalOpen.value = true;
 
         return;
     }
 
+    if (await rememberPendingAuthAction(action, page.url)) {
+        authModalOpen.value = true;
+    }
+};
+const saveSearch = (): void => {
+    if (props.isSearchSaved || savingSearch.value) {
+        return;
+    }
+
+    if (props.savedSearch?.hasChanges) {
+        refinementModalOpen.value = true;
+
+        return;
+    }
+
+    createSavedSearch();
+};
+const currentSavedSearch = () => {
     const filters = Object.fromEntries(
         Object.entries(queryParameters()).filter(
-            ([, value]) => value !== undefined,
+            ([key, value]) => key !== 'saved_search' && value !== undefined,
         ),
     );
-    router.post(
-        saveSearchRoute.url(),
-        {
-            name: nearbyActive.value
-                ? tr('Propiedades cerca de mí', 'Properties near me')
-                : location.value
-                  ? `${tr('Propiedades en', 'Properties in')} ${location.value}`
-                  : tr('Mi búsqueda', 'My search'),
-            filters,
-            alerts_enabled: true,
+
+    return {
+        name: nearbyActive.value
+            ? tr('Propiedades cerca de mí', 'Properties near me')
+            : location.value
+              ? `${tr('Propiedades en', 'Properties in')} ${location.value}`
+              : tr('Mi búsqueda', 'My search'),
+        filters,
+        alerts_enabled: true,
+    };
+};
+const createSavedSearch = (): void => {
+    const savedSearch = currentSavedSearch();
+
+    if (!page.props.auth.user) {
+        requireAuth(
+            tr(
+                'Necesitas una cuenta para guardar esta búsqueda.',
+                'You need an account to save this search.',
+            ),
+            {
+                type: 'save_search',
+                payload: { saved_search: savedSearch },
+            },
+        );
+
+        return;
+    }
+
+    router.post(saveSearchRoute.url(), savedSearch, {
+        preserveScroll: true,
+        onStart: () => {
+            savingSearch.value = true;
         },
-        { preserveScroll: true },
+        onFinish: () => {
+            savingSearch.value = false;
+        },
+    });
+};
+const updateSavedSearch = (): void => {
+    if (!props.savedSearch) {
+        return;
+    }
+
+    router.patch(
+        updateSavedSearchRoute.url(props.savedSearch.id),
+        { filters: currentSavedSearch().filters },
+        {
+            preserveScroll: true,
+            onStart: () => {
+                savingSearch.value = true;
+            },
+            onSuccess: () => {
+                refinementModalOpen.value = false;
+            },
+            onFinish: () => {
+                savingSearch.value = false;
+            },
+        },
     );
+};
+const saveRefinedSearchAsNew = (): void => {
+    createSavedSearch();
+    refinementModalOpen.value = false;
 };
 const toggleFavorite = (property: Rental): void => {
     if (!page.props.auth.user) {
-        router.visit(login.url());
+        requireAuth(
+            tr(
+                'Necesitas una cuenta para guardar esta propiedad.',
+                'You need an account to save this property.',
+            ),
+            {
+                type: 'favorite_property',
+                payload: { property_slug: property.slug },
+            },
+        );
 
         return;
     }
@@ -200,7 +357,10 @@ const queryParameters = (
     location: location.value || undefined,
     property_type: propertyType.value || undefined,
     listing_type: listingType.value || undefined,
-    currency: currency.value || undefined,
+    currency:
+        currency.value && currency.value !== props.baseCurrency
+            ? currency.value
+            : undefined,
     min_price: minPrice.value || undefined,
     max_price: maxPrice.value || undefined,
     bedrooms: bedrooms.value || undefined,
@@ -214,6 +374,7 @@ const queryParameters = (
     sort: sort.value === 'newest' ? undefined : sort.value,
     latitude: nearbyLatitude.value ?? undefined,
     longitude: nearbyLongitude.value ?? undefined,
+    saved_search: props.savedSearch?.id,
     ...additional,
 });
 
@@ -250,9 +411,9 @@ const searchMapBounds = (bounds: {
 
 const activeAdvancedFilters = computed(() => {
     const filters: Array<{ key: AdvancedFilterKey; label: string }> = [];
-    const money = currency.value || 'HNL';
+    const money = currency.value || props.baseCurrency;
 
-    if (currency.value) {
+    if (currency.value && currency.value !== props.baseCurrency) {
         filters.push({ key: 'currency', label: currency.value });
     }
 
@@ -330,7 +491,7 @@ const priceFilterLabel = computed(() => {
         return tr('Precio', 'Price');
     }
 
-    const selectedCurrency = currency.value || 'HNL';
+    const selectedCurrency = currency.value || props.baseCurrency;
 
     return `${selectedCurrency} ${minPrice.value || '0'}–${maxPrice.value || '∞'}`;
 });
@@ -365,7 +526,7 @@ const homeTypeFilterLabel = computed(() =>
 );
 
 const clearAdvancedFilters = (): void => {
-    currency.value = '';
+    currency.value = props.baseCurrency;
     minPrice.value = '';
     maxPrice.value = '';
     bedrooms.value = '';
@@ -395,27 +556,20 @@ const cardTone = (index: number): string =>
         'from-orange-200 via-amber-100 to-stone-100',
         'from-violet-200 via-rose-100 to-orange-100',
     ][index % 4];
-
-const formatPrice = (property: Rental): string =>
-    new Intl.NumberFormat('es-HN', {
-        style: 'currency',
-        currency: property.currency,
-        maximumFractionDigits: 0,
-    }).format(property.priceAmount);
 </script>
 
 <template>
     <Head title="Property search" />
 
-    <div class="min-h-screen bg-slate-100 text-[#13233a]">
+    <div
+        class="public-site min-h-screen bg-[var(--public-surface)] text-[var(--public-text)]"
+    >
         <PublicHeader />
 
-        <main class="mx-auto max-w-7xl px-5 py-8 sm:px-8">
-            <div
-                class="rounded-3xl border border-stone-200 bg-white p-3 shadow-sm"
-            >
+        <main class="public-container py-7">
+            <div class="public-search-shell p-2">
                 <form
-                    class="grid gap-3 md:grid-cols-[1fr_190px_160px_auto]"
+                    class="grid gap-1 md:grid-cols-[1fr_190px_auto]"
                     @submit.prevent="search"
                 >
                     <LocationTypeahead
@@ -430,38 +584,7 @@ const formatPrice = (property: Rental): string =>
                         @select="searchSelectedLocation"
                     />
                     <label
-                        class="flex items-center gap-3 rounded-2xl bg-stone-50 px-4 py-3"
-                    >
-                        <Building2 class="size-5 text-blue-700" />
-                        <select
-                            v-model="propertyType"
-                            class="w-full bg-transparent text-sm font-medium outline-none"
-                        >
-                            <option value="">
-                                {{ tr('Cualquier propiedad', 'Any home') }}
-                            </option>
-                            <option value="apartment">
-                                {{ tr('Apartamento', 'Apartment') }}
-                            </option>
-                            <option value="house">
-                                {{ tr('Casa', 'House') }}
-                            </option>
-                            <option value="condominium">
-                                {{ tr('Condominio', 'Condominium') }}
-                            </option>
-                            <option value="townhouse">
-                                {{ tr('Casa adosada', 'Townhouse') }}
-                            </option>
-                            <option value="studio">
-                                {{ tr('Estudio', 'Studio') }}
-                            </option>
-                            <option value="room">
-                                {{ tr('Habitación', 'Room') }}
-                            </option>
-                        </select>
-                    </label>
-                    <label
-                        class="flex items-center gap-3 rounded-2xl bg-stone-50 px-4 py-3"
+                        class="flex items-center gap-3 border-l border-[var(--public-border)] px-5 py-3 transition hover:bg-[var(--public-surface-hover)]"
                     >
                         <SlidersHorizontal class="size-5 text-blue-700" />
                         <select
@@ -480,7 +603,7 @@ const formatPrice = (property: Rental): string =>
                         </select>
                     </label>
                     <button
-                        class="flex items-center justify-center gap-2 rounded-2xl bg-[#123b6d] px-6 py-3 font-semibold text-white transition hover:bg-[#185a96]"
+                        class="flex items-center justify-center gap-2 rounded-[10px] bg-primary px-7 py-3 font-semibold text-primary-foreground transition hover:bg-primary-hover"
                         type="submit"
                     >
                         <Search class="size-5" /> {{ tr('Buscar', 'Search') }}
@@ -488,35 +611,58 @@ const formatPrice = (property: Rental): string =>
                 </form>
 
                 <div
-                    class="mt-3 overflow-x-auto border-t border-stone-200 pt-3"
+                    class="mt-3 overflow-x-auto border-t border-[var(--public-border)] pt-3"
                 >
                     <div class="flex min-w-max items-center gap-2 pb-1">
                         <button
                             type="button"
-                            class="inline-flex items-center justify-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2.5 text-sm font-semibold"
+                            class="public-chip"
+                            :class="
+                                isSearchSaved
+                                    ? 'border-primary text-[var(--public-brand-ink)]'
+                                    : savedSearch?.hasChanges
+                                      ? 'border-amber-400 text-amber-800'
+                                      : ''
+                            "
+                            :disabled="isSearchSaved || savingSearch"
+                            :aria-pressed="isSearchSaved"
                             @click="saveSearch"
                         >
-                            <Heart class="size-4" />{{
-                                tr('Guardar búsqueda', 'Save search')
+                            <Heart
+                                class="size-4 text-[var(--public-brand-ink)]"
+                                :class="isSearchSaved ? 'fill-current' : ''"
+                            />{{
+                                isSearchSaved
+                                    ? tr('Búsqueda guardada', 'Search saved')
+                                    : savedSearch?.hasChanges
+                                      ? tr(
+                                            'Cambios sin guardar',
+                                            'Unsaved changes',
+                                        )
+                                      : savingSearch
+                                        ? tr('Guardando…', 'Saving…')
+                                        : tr('Guardar búsqueda', 'Save search')
                             }}
                         </button>
                         <button
                             type="button"
-                            class="inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold transition hover:border-blue-700"
+                            class="public-chip"
                             :aria-expanded="showFilters"
                             @click="showFilters = true"
                         >
-                            <Filter class="size-4" />
+                            <Filter
+                                class="size-4 text-[var(--public-brand-ink)]"
+                            />
                             {{ tr('Filtros', 'Filters') }}
                             <span
                                 v-if="activeAdvancedFilters.length"
-                                class="grid size-5 place-items-center rounded-full bg-blue-700 text-xs text-white"
+                                class="grid size-5 place-items-center rounded-full bg-primary text-xs text-primary-foreground"
                                 >{{ activeAdvancedFilters.length }}</span
                             >
                         </button>
                         <button
                             type="button"
-                            class="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-3 text-sm font-semibold transition hover:border-blue-700"
+                            class="public-chip"
                             :class="
                                 minPrice || maxPrice
                                     ? 'border-blue-700 text-blue-800'
@@ -524,12 +670,17 @@ const formatPrice = (property: Rental): string =>
                             "
                             @click="showFilters = true"
                         >
+                            <CircleDollarSign
+                                class="size-4 text-[var(--public-brand-ink)]"
+                            />
                             {{ priceFilterLabel }}
-                            <ChevronDown class="size-4" />
+                            <ChevronDown
+                                class="size-4 text-[var(--public-brand-ink)]"
+                            />
                         </button>
                         <button
                             type="button"
-                            class="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-3 text-sm font-semibold transition hover:border-blue-700"
+                            class="public-chip"
                             :class="
                                 bedrooms || bathrooms
                                     ? 'border-blue-700 text-blue-800'
@@ -537,12 +688,17 @@ const formatPrice = (property: Rental): string =>
                             "
                             @click="showFilters = true"
                         >
+                            <BedDouble
+                                class="size-4 text-[var(--public-brand-ink)]"
+                            />
                             {{ roomsFilterLabel }}
-                            <ChevronDown class="size-4" />
+                            <ChevronDown
+                                class="size-4 text-[var(--public-brand-ink)]"
+                            />
                         </button>
                         <button
                             type="button"
-                            class="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-3 text-sm font-semibold transition hover:border-blue-700"
+                            class="public-chip"
                             :class="
                                 propertyType
                                     ? 'border-blue-700 text-blue-800'
@@ -550,8 +706,13 @@ const formatPrice = (property: Rental): string =>
                             "
                             @click="showFilters = true"
                         >
+                            <Building2
+                                class="size-4 text-[var(--public-brand-ink)]"
+                            />
                             {{ homeTypeFilterLabel }}
-                            <ChevronDown class="size-4" />
+                            <ChevronDown
+                                class="size-4 text-[var(--public-brand-ink)]"
+                            />
                         </button>
                         <button
                             v-if="activeAdvancedFilters.length"
@@ -588,7 +749,7 @@ const formatPrice = (property: Rental): string =>
                 >
                     <aside
                         v-if="showFilters"
-                        class="fixed inset-y-0 right-0 z-50 flex w-full translate-x-0 flex-col bg-white text-[#13233a] shadow-2xl sm:max-w-xl"
+                        class="public-site fixed inset-y-0 right-0 z-50 flex w-full translate-x-0 flex-col bg-[var(--public-surface-raised)] text-[var(--public-text)] shadow-2xl sm:max-w-xl"
                         :aria-label="
                             tr('Filtros de propiedades', 'Property filters')
                         "
@@ -618,10 +779,18 @@ const formatPrice = (property: Rental): string =>
                                 <h3 class="text-lg font-semibold">
                                     {{ tr('Precio', 'Price') }}
                                 </h3>
+                                <p class="mt-1 text-sm text-stone-500">
+                                    {{
+                                        tr(
+                                            'Mostrar precios en',
+                                            'Show prices in',
+                                        )
+                                    }}
+                                </p>
                                 <div class="mt-4 grid grid-cols-3 gap-2">
                                     <button
-                                        v-for="option in ['', 'HNL', 'USD']"
-                                        :key="option || 'any'"
+                                        v-for="option in currencies"
+                                        :key="option"
                                         type="button"
                                         class="rounded-xl border px-3 py-3 text-sm font-semibold transition"
                                         :class="
@@ -631,33 +800,33 @@ const formatPrice = (property: Rental): string =>
                                         "
                                         @click="currency = option"
                                     >
-                                        {{ option || tr('Cualquiera', 'Any') }}
+                                        {{ option }}
                                     </button>
                                 </div>
                                 <div class="mt-4 grid grid-cols-2 gap-3">
                                     <label
-                                        class="grid gap-2 text-sm font-semibold"
+                                        class="grid min-w-0 gap-2 text-sm font-semibold"
                                     >
                                         {{ tr('Mínimo', 'Minimum') }}
                                         <input
                                             v-model="minPrice"
                                             type="number"
                                             min="0"
-                                            class="rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
+                                            class="w-full min-w-0 rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
                                             :placeholder="
                                                 tr('Sin mínimo', 'No min')
                                             "
                                         />
                                     </label>
                                     <label
-                                        class="grid gap-2 text-sm font-semibold"
+                                        class="grid min-w-0 gap-2 text-sm font-semibold"
                                     >
                                         {{ tr('Máximo', 'Maximum') }}
                                         <input
                                             v-model="maxPrice"
                                             type="number"
                                             min="0"
-                                            class="rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
+                                            class="w-full min-w-0 rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
                                             :placeholder="
                                                 tr('Sin máximo', 'No max')
                                             "
@@ -809,7 +978,7 @@ const formatPrice = (property: Rental): string =>
                                 </h3>
                                 <div class="mt-4 grid grid-cols-2 gap-3">
                                     <label
-                                        class="grid gap-2 text-sm font-semibold"
+                                        class="grid min-w-0 gap-2 text-sm font-semibold"
                                     >
                                         {{
                                             tr(
@@ -819,7 +988,7 @@ const formatPrice = (property: Rental): string =>
                                         }}
                                         <select
                                             v-model="parkingSpaces"
-                                            class="rounded-xl border border-stone-300 bg-white px-4 py-3 font-normal outline-none focus:border-blue-700"
+                                            class="rounded-xl border border-[var(--public-border)] bg-[var(--public-surface-raised)] px-4 py-3 font-normal text-[var(--public-text)] outline-none focus:border-primary"
                                         >
                                             <option value="">
                                                 {{ tr('Cualquiera', 'Any') }}
@@ -839,7 +1008,7 @@ const formatPrice = (property: Rental): string =>
                                         {{ tr('Amueblado', 'Furnishing') }}
                                         <select
                                             v-model="furnishing"
-                                            class="rounded-xl border border-stone-300 bg-white px-4 py-3 font-normal outline-none focus:border-blue-700"
+                                            class="rounded-xl border border-[var(--public-border)] bg-[var(--public-surface-raised)] px-4 py-3 font-normal text-[var(--public-text)] outline-none focus:border-primary"
                                         >
                                             <option value="">
                                                 {{ tr('Cualquiera', 'Any') }}
@@ -868,7 +1037,7 @@ const formatPrice = (property: Rental): string =>
                                         </select>
                                     </label>
                                     <label
-                                        class="grid gap-2 text-sm font-semibold"
+                                        class="grid min-w-0 gap-2 text-sm font-semibold"
                                     >
                                         {{
                                             tr(
@@ -880,14 +1049,14 @@ const formatPrice = (property: Rental): string =>
                                             v-model="minArea"
                                             type="number"
                                             min="0"
-                                            class="rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
+                                            class="w-full min-w-0 rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
                                             :placeholder="
                                                 tr('Sin mínimo', 'No min')
                                             "
                                         />
                                     </label>
                                     <label
-                                        class="grid gap-2 text-sm font-semibold"
+                                        class="grid min-w-0 gap-2 text-sm font-semibold"
                                     >
                                         {{
                                             tr(
@@ -899,7 +1068,7 @@ const formatPrice = (property: Rental): string =>
                                             v-model="maxArea"
                                             type="number"
                                             min="0"
-                                            class="rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
+                                            class="w-full min-w-0 rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
                                             :placeholder="
                                                 tr('Sin máximo', 'No max')
                                             "
@@ -911,7 +1080,7 @@ const formatPrice = (property: Rental): string =>
                                         {{ tr('Servicios', 'Utilities') }}
                                         <select
                                             v-model="utilitiesIncluded"
-                                            class="rounded-xl border border-stone-300 bg-white px-4 py-3 font-normal outline-none focus:border-blue-700"
+                                            class="rounded-xl border border-[var(--public-border)] bg-[var(--public-surface-raised)] px-4 py-3 font-normal text-[var(--public-text)] outline-none focus:border-primary"
                                         >
                                             <option value="">
                                                 {{ tr('Cualquiera', 'Any') }}
@@ -936,7 +1105,7 @@ const formatPrice = (property: Rental): string =>
                         </div>
 
                         <footer
-                            class="grid grid-cols-2 gap-3 border-t border-stone-200 bg-white p-5 sm:px-7"
+                            class="grid grid-cols-2 gap-3 border-t border-[var(--public-border)] bg-[var(--public-surface-raised)] p-5 sm:px-7"
                         >
                             <button
                                 type="button"
@@ -947,7 +1116,7 @@ const formatPrice = (property: Rental): string =>
                             </button>
                             <button
                                 type="button"
-                                class="rounded-xl bg-[#123b6d] px-5 py-3 font-semibold text-white transition hover:bg-[#185a96]"
+                                class="rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground transition hover:bg-primary-hover"
                                 @click="applyFilters"
                             >
                                 {{ tr('Ver resultados', 'View results') }}
@@ -977,7 +1146,7 @@ const formatPrice = (property: Rental): string =>
                             }}</span>
                             <select
                                 v-model="sort"
-                                class="rounded-full border border-stone-300 bg-white px-4 py-2.5 transition outline-none hover:border-blue-700"
+                                class="public-chip appearance-auto pr-9 outline-none"
                                 :aria-label="
                                     tr('Ordenar resultados', 'Sort results')
                                 "
@@ -996,7 +1165,7 @@ const formatPrice = (property: Rental): string =>
                         </label>
                         <button
                             type="button"
-                            class="inline-flex items-center justify-center gap-2 rounded-full border border-[#123b6d] bg-white px-5 py-2.5 text-sm font-semibold text-[#123b6d] shadow-sm transition hover:bg-[#123b6d] hover:text-white"
+                            class="public-chip border-primary text-[var(--public-brand-ink)] hover:bg-primary hover:text-primary-foreground"
                             :aria-pressed="showMap"
                             @click="showMap = !showMap"
                         >
@@ -1020,149 +1189,21 @@ const formatPrice = (property: Rental): string =>
                     "
                 >
                     <section
-                        class="grid gap-5 sm:grid-cols-2"
+                        class="grid gap-x-6 gap-y-10 sm:grid-cols-2"
                         :class="
                             showMap
-                                ? 'xl:grid-cols-3'
-                                : 'lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+                                ? 'xl:grid-cols-2 2xl:grid-cols-3'
+                                : 'lg:grid-cols-3 xl:grid-cols-4'
                         "
                     >
-                        <Link
+                        <PublicPropertyCard
                             v-for="(property, index) in properties.data"
                             :key="property.id"
-                            :href="propertyShow.url(property.slug)"
-                            class="overflow-hidden rounded-[1.75rem] border border-stone-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-                        >
-                            <div
-                                class="relative grid aspect-[16/10] place-items-center bg-gradient-to-br"
-                                :class="cardTone(index)"
-                            >
-                                <img
-                                    v-if="property.primaryImage"
-                                    :src="property.primaryImage.url"
-                                    :alt="
-                                        property.primaryImage.altText ??
-                                        property.name ??
-                                        'Rental property'
-                                    "
-                                    class="absolute inset-0 size-full object-cover"
-                                    loading="lazy"
-                                />
-                                <div
-                                    v-else
-                                    class="grid size-24 place-items-center rounded-[2rem] bg-white/65 text-[#123b6d] shadow-sm backdrop-blur"
-                                >
-                                    <House
-                                        class="size-11"
-                                        :stroke-width="1.5"
-                                    />
-                                </div>
-                                <span
-                                    class="absolute top-4 left-4 rounded-full bg-white/85 px-3 py-1.5 text-xs font-bold backdrop-blur"
-                                    >{{ humanize(property.type) }}</span
-                                >
-                                <button
-                                    type="button"
-                                    class="absolute top-4 right-4 grid size-10 place-items-center rounded-full bg-white/90 text-blue-800 shadow"
-                                    :aria-label="
-                                        tr('Guardar propiedad', 'Save property')
-                                    "
-                                    @click.prevent.stop="
-                                        toggleFavorite(property)
-                                    "
-                                >
-                                    <Heart
-                                        class="size-5"
-                                        :class="
-                                            property.isFavorited
-                                                ? 'fill-current'
-                                                : ''
-                                        "
-                                    />
-                                </button>
-                            </div>
-                            <div class="p-5">
-                                <div
-                                    class="flex items-start justify-between gap-4"
-                                >
-                                    <div>
-                                        <h2
-                                            class="line-clamp-1 text-lg font-semibold"
-                                        >
-                                            {{
-                                                property.name ??
-                                                'Rental property'
-                                            }}
-                                        </h2>
-                                        <p
-                                            class="mt-1 flex items-center gap-1.5 text-sm text-stone-500"
-                                        >
-                                            <MapPin class="size-4" />
-                                            {{ property.location }}, Honduras
-                                        </p>
-                                    </div>
-                                </div>
-                                <div
-                                    class="mt-5 grid grid-cols-4 gap-2 border-t border-stone-100 pt-4 text-center text-xs text-stone-600"
-                                >
-                                    <span
-                                        class="flex flex-col items-center gap-1"
-                                        ><BedDouble
-                                            class="size-4 text-blue-700"
-                                        />{{ property.bedrooms }} beds</span
-                                    >
-                                    <span
-                                        class="flex flex-col items-center gap-1"
-                                        ><Bath class="size-4 text-blue-700" />{{
-                                            property.bathrooms
-                                        }}
-                                        baths</span
-                                    >
-                                    <span
-                                        class="flex flex-col items-center gap-1"
-                                        ><Car class="size-4 text-blue-700" />{{
-                                            property.parkingSpaces
-                                        }}
-                                        parks</span
-                                    >
-                                    <span
-                                        class="flex flex-col items-center gap-1"
-                                        ><Maximize2
-                                            class="size-4 text-blue-700"
-                                        />{{
-                                            property.interiorAreaM2 ?? '—'
-                                        }}
-                                        m²</span
-                                    >
-                                </div>
-                                <div
-                                    class="mt-4 flex items-center justify-between"
-                                >
-                                    <span
-                                        class="text-xs font-medium text-stone-500"
-                                        >{{
-                                            humanize(property.furnishing)
-                                        }}</span
-                                    >
-                                    <span class="font-semibold text-blue-800"
-                                        >{{ formatPrice(property)
-                                        }}<span
-                                            v-if="
-                                                property.listingType === 'rent'
-                                            "
-                                            class="text-xs font-normal text-stone-500"
-                                            >/mo</span
-                                        ></span
-                                    >
-                                </div>
-                                <p
-                                    v-if="property.utilitiesIncluded"
-                                    class="mt-2 text-xs font-medium text-blue-700"
-                                >
-                                    Utilities included
-                                </p>
-                            </div>
-                        </Link>
+                            :property="property"
+                            :return-to="resultsContextUrl"
+                            :tone="cardTone(index)"
+                            @favorite="toggleFavorite(property)"
+                        />
                     </section>
                     <aside
                         v-if="showMap"
@@ -1171,6 +1212,8 @@ const formatPrice = (property: Rental): string =>
                         <PropertyResultsMap
                             :properties="properties.data"
                             :initial-bounds="initialBounds"
+                            :return-to="resultsContextUrl"
+                            @favorite="toggleFavorite"
                             @search="searchMapBounds"
                         />
                     </aside>
@@ -1179,7 +1222,7 @@ const formatPrice = (property: Rental): string =>
 
             <section
                 v-else
-                class="mt-8 grid min-h-[360px] place-items-center rounded-[2rem] border border-dashed border-stone-300 bg-white p-8 text-center"
+                class="mt-8 grid min-h-[360px] place-items-center rounded-[2rem] border border-dashed border-[var(--public-border)] bg-[var(--public-surface-raised)] p-8 text-center"
             >
                 <div class="max-w-md">
                     <span
@@ -1209,8 +1252,8 @@ const formatPrice = (property: Rental): string =>
                         class="grid min-w-10 place-items-center rounded-xl border px-3 py-2 text-sm font-semibold transition"
                         :class="
                             link.active
-                                ? 'border-[#123b6d] bg-[#123b6d] text-white'
-                                : 'border-stone-200 bg-white hover:border-blue-700'
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'border-[var(--public-border)] bg-[var(--public-surface-raised)] hover:border-primary'
                         "
                         >{{ paginationLabel(link.label) }}</Link
                     >
@@ -1222,5 +1265,19 @@ const formatPrice = (property: Rental): string =>
                 </template>
             </nav>
         </main>
+
+        <AuthModal
+            v-model:open="authModalOpen"
+            :description="authModalDescription"
+        />
+        <SavedSearchRefinementModal
+            v-if="savedSearch"
+            v-model:open="refinementModalOpen"
+            :processing="savingSearch"
+            :search-name="savedSearch.name"
+            @update="updateSavedSearch"
+            @duplicate="saveRefinedSearchAsNew"
+        />
+        <Toaster />
     </div>
 </template>

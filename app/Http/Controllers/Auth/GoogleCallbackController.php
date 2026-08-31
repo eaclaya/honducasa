@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Actions\Auth\ExecutePendingAuthAction;
 use App\Actions\Auth\ResolveGoogleUser;
 use App\Actions\Teams\AcceptTeamInvitation;
 use App\Http\Controllers\Controller;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Support\SafeRedirectPath;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,8 +19,11 @@ use Throwable;
 
 class GoogleCallbackController extends Controller
 {
-    public function __invoke(Request $request, ResolveGoogleUser $resolveGoogleUser): RedirectResponse
-    {
+    public function __invoke(
+        Request $request,
+        ResolveGoogleUser $resolveGoogleUser,
+        ExecutePendingAuthAction $executePendingAuthAction,
+    ): RedirectResponse {
         try {
             $googleUser = Socialite::driver('google')->user();
 
@@ -44,11 +49,16 @@ class GoogleCallbackController extends Controller
 
         $this->acceptPendingInvitation($request, $user);
 
+        $pendingActionRedirect = $executePendingAuthAction->handle($request, $user);
+        $redirect = SafeRedirectPath::resolve($request->session()->pull('auth.google.redirect'));
         $team = $user->currentTeam;
-
-        return redirect()->intended($team
+        $defaultRedirect = $team
             ? route('dashboard', ['current_team' => $team->slug])
-            : route('user.dashboard'));
+            : route('user.dashboard');
+
+        return $pendingActionRedirect
+            ? redirect($pendingActionRedirect)
+            : redirect()->intended($redirect ?? $defaultRedirect);
     }
 
     /**

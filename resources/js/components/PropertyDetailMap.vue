@@ -81,8 +81,8 @@ onMounted(() => {
                 longitude,
             ]),
             {
-                color: '#1d4ed8',
-                fillColor: '#2563eb',
+                color: '#1D4ED8',
+                fillColor: '#2563EB',
                 fillOpacity: 0.18,
                 weight: 2,
             },
@@ -94,8 +94,8 @@ onMounted(() => {
 
     if (props.precision === 'approximate') {
         const area = circle(center, {
-            color: '#1d4ed8',
-            fillColor: '#2563eb',
+            color: '#1D4ED8',
+            fillColor: '#2563EB',
             fillOpacity: 0.18,
             radius: props.radiusMeters ?? 1_000,
             weight: 2,

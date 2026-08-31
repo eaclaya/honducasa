@@ -14,3 +14,12 @@ Schedule::command('app:send-saved-search-alerts')
     ->hourly()
     ->withoutOverlapping()
     ->description('Notify users about new saved-search matches');
+
+Schedule::command('app:pause-expired-trial-listings')
+    ->hourly()
+    ->withoutOverlapping()
+    ->description('Pause listings for teams whose trial ended without a subscription');
+
+Schedule::command('horizon:snapshot')
+    ->everyFiveMinutes()
+    ->description('Capture Horizon queue metrics');

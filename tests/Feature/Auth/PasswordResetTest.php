@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Fortify\Features;
 
@@ -23,6 +24,16 @@ test('reset password link can be requested', function () {
     $this->post(route('password.email'), ['email' => $user->email]);
 
     Notification::assertSentTo($user, ResetPassword::class);
+});
+
+test('the password reset email is translated into Spanish', function () {
+    App::setLocale('es');
+
+    $mail = (new ResetPassword('dummy-token'))->toMail(User::factory()->make());
+
+    expect($mail->subject)->toBe('Restablece tu contraseña')
+        ->and($mail->introLines)->toContain('Recibes este correo porque recibimos una solicitud para restablecer la contraseña de tu cuenta.')
+        ->and($mail->actionText)->toBe('Restablecer contraseña');
 });
 
 test('reset password screen can be rendered', function () {

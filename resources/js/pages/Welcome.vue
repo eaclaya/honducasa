@@ -13,18 +13,24 @@ import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import LocationTypeahead from '@/components/LocationTypeahead.vue';
 import PublicHeader from '@/components/PublicHeader.vue';
 import { register } from '@/routes';
-import {
-    create as createListing,
-    start as startListing,
-} from '@/routes/listings';
+import { create as createListing } from '@/routes/listings';
+import { create as createPersonalListing } from '@/routes/personal-listings';
 import { index as rentals } from '@/routes/rentals';
+import { index as savedSearchesIndex } from '@/routes/saved-searches';
+
+type SavedSearch = {
+    id: number;
+    name: string;
+    filters: Record<string, string | number | boolean | null>;
+};
+
+defineProps<{ savedSearches: SavedSearch[] }>();
 
 const page = usePage();
 const locale = computed(() => page.props.locale);
 const tr = (es: string, en: string): string =>
     locale.value === 'es' ? es : en;
 const location = ref('');
-const propertyType = ref('');
 const listingType = ref('rent');
 const locating = ref(false);
 const locationError = ref('');
@@ -34,13 +40,12 @@ const listPropertyUrl = computed(() => {
         return createListing.url(page.props.currentTeam.slug);
     }
 
-    return page.props.auth.user ? startListing().url : register.url();
+    return page.props.auth.user ? createPersonalListing().url : register.url();
 });
 
 const searchRentals = (): void => {
     router.get(rentals.url(), {
         location: location.value || undefined,
-        property_type: propertyType.value || undefined,
         listing_type: listingType.value,
     });
 };
@@ -69,7 +74,6 @@ const searchNearby = (): void => {
             router.get(rentals.url(), {
                 latitude: coords.latitude,
                 longitude: coords.longitude,
-                property_type: propertyType.value || undefined,
                 listing_type: listingType.value,
             });
         },
@@ -94,12 +98,14 @@ const exploreCity = (city: string): void => {
 <template>
     <Head title="Homes for rent and sale in Honduras" />
 
-    <div class="min-h-screen bg-slate-100 text-[#13233a] selection:bg-blue-200">
-        <PublicHeader overlay show-explore-links />
+    <div
+        class="public-site min-h-screen bg-[var(--public-surface)] text-[var(--public-text)] selection:bg-blue-200"
+    >
+        <PublicHeader overlay />
 
         <main>
             <section
-                class="relative isolate min-h-[760px] overflow-hidden bg-[#123b6d] bg-[url('/images/honducasa-hero.jpg')] bg-cover bg-center text-white lg:min-h-[100svh]"
+                class="relative isolate min-h-[760px] overflow-hidden bg-primary bg-[url('/images/honducasa-hero.jpg')] bg-cover bg-center text-white lg:min-h-[100svh]"
             >
                 <div class="absolute inset-0 -z-10 bg-black/20" />
                 <div
@@ -119,17 +125,17 @@ const exploreCity = (city: string): void => {
                                     'Find a place that feels like',
                                 )
                             }}
-                            <span class="text-[#67d7ff]">{{
+                            <span class="text-blue-300">{{
                                 tr(' hogar.', ' home.')
                             }}</span>
                         </h1>
 
                         <form
-                            class="mx-auto mt-12 w-full max-w-6xl rounded-3xl bg-white p-3 text-left text-[#13233a] shadow-2xl shadow-black/40"
+                            class="public-search-shell mx-auto mt-12 w-full max-w-6xl p-2 text-left text-[var(--public-text)]"
                             @submit.prevent="searchRentals"
                         >
                             <div
-                                class="grid gap-2 md:grid-cols-[1.45fr_1fr_.75fr_auto]"
+                                class="grid gap-2 md:grid-cols-[1.45fr_.75fr_auto]"
                             >
                                 <LocationTypeahead
                                     v-model="location"
@@ -148,42 +154,7 @@ const exploreCity = (city: string): void => {
                                     @select="searchSelectedLocation"
                                 />
                                 <label
-                                    class="rounded-2xl border-t border-stone-100 px-4 py-3 md:border-t-0 md:border-l"
-                                >
-                                    <span
-                                        class="block text-xs font-bold text-stone-600"
-                                        >{{
-                                            tr(
-                                                'Tipo de propiedad',
-                                                'Property type',
-                                            )
-                                        }}</span
-                                    >
-                                    <select
-                                        v-model="propertyType"
-                                        class="mt-0.5 w-full bg-transparent text-sm font-semibold text-[#13233a] outline-none"
-                                    >
-                                        <option value="">
-                                            {{
-                                                tr(
-                                                    'Cualquier propiedad',
-                                                    'Any home',
-                                                )
-                                            }}
-                                        </option>
-                                        <option value="apartment">
-                                            {{ tr('Apartamento', 'Apartment') }}
-                                        </option>
-                                        <option value="house">
-                                            {{ tr('Casa', 'House') }}
-                                        </option>
-                                        <option value="condominium">
-                                            {{ tr('Condominio', 'Condo') }}
-                                        </option>
-                                    </select>
-                                </label>
-                                <label
-                                    class="rounded-2xl border-t border-stone-100 px-4 py-3 md:border-t-0 md:border-l"
+                                    class="border-t border-[var(--public-border)] px-6 py-3 md:border-t-0 md:border-l"
                                 >
                                     <span
                                         class="block text-xs font-bold text-stone-600"
@@ -191,7 +162,7 @@ const exploreCity = (city: string): void => {
                                     >
                                     <select
                                         v-model="listingType"
-                                        class="mt-0.5 w-full bg-transparent text-sm font-semibold text-[#13233a] outline-none"
+                                        class="mt-0.5 w-full bg-transparent text-sm font-semibold text-[var(--public-text)] outline-none"
                                     >
                                         <option value="rent">
                                             {{ tr('Alquilar', 'Rent') }}
@@ -202,7 +173,7 @@ const exploreCity = (city: string): void => {
                                     </select>
                                 </label>
                                 <button
-                                    class="flex items-center justify-center gap-2 rounded-2xl bg-[#67d7ff] px-6 py-4 text-sm font-bold text-[#123b6d] transition hover:bg-[#42c5f5]"
+                                    class="flex items-center justify-center gap-2 rounded-[10px] bg-primary px-7 py-4 text-sm font-bold text-primary-foreground transition hover:bg-primary-hover"
                                     type="submit"
                                 >
                                     <Search class="size-5" />
@@ -235,6 +206,84 @@ const exploreCity = (city: string): void => {
                             </button>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <section
+                v-if="page.props.auth.user && savedSearches.length"
+                class="mx-auto max-w-7xl px-5 pt-20 sm:px-8"
+            >
+                <div
+                    class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"
+                >
+                    <div>
+                        <p
+                            class="text-sm font-bold tracking-[0.16em] text-blue-700 uppercase"
+                        >
+                            {{ tr('Continúa buscando', 'Continue searching') }}
+                        </p>
+                        <h2
+                            class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl"
+                        >
+                            {{
+                                tr(
+                                    'Tus búsquedas guardadas',
+                                    'Your saved searches',
+                                )
+                            }}
+                        </h2>
+                    </div>
+                    <Link
+                        :href="savedSearchesIndex.url()"
+                        class="group flex items-center gap-2 font-semibold text-blue-800"
+                    >
+                        {{ tr('Ver todas', 'View all') }}
+                        <ArrowRight
+                            class="size-4 transition group-hover:translate-x-1"
+                        />
+                    </Link>
+                </div>
+
+                <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <Link
+                        v-for="savedSearch in savedSearches"
+                        :key="savedSearch.id"
+                        :href="
+                            rentals.url({
+                                query: {
+                                    ...savedSearch.filters,
+                                    saved_search: savedSearch.id,
+                                },
+                            })
+                        "
+                        class="group flex items-center gap-4 rounded-3xl border border-[var(--public-border)] bg-[var(--public-surface-raised)] p-5 transition hover:border-primary hover:shadow-md"
+                    >
+                        <span
+                            class="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground"
+                        >
+                            <Search class="size-5" />
+                        </span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block truncate font-semibold">{{
+                                savedSearch.name
+                            }}</span>
+                            <span
+                                class="mt-1 block truncate text-sm text-stone-500"
+                            >
+                                {{
+                                    Object.values(savedSearch.filters)
+                                        .filter(
+                                            (value) =>
+                                                value !== null && value !== '',
+                                        )
+                                        .join(' · ')
+                                }}
+                            </span>
+                        </span>
+                        <ArrowRight
+                            class="size-5 shrink-0 transition group-hover:translate-x-1"
+                        />
+                    </Link>
                 </div>
             </section>
 
@@ -329,7 +378,7 @@ const exploreCity = (city: string): void => {
 
             <section
                 id="how-it-works"
-                class="border-y border-stone-200 bg-white"
+                class="border-y border-[var(--public-border)] bg-[var(--public-surface-raised)]"
             >
                 <div
                     class="mx-auto grid max-w-7xl gap-14 px-5 py-24 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:items-center"
@@ -402,7 +451,7 @@ const exploreCity = (city: string): void => {
                                 },
                             ]"
                             :key="item.title"
-                            class="rounded-3xl border border-stone-200 bg-[#faf9f5] p-6"
+                            class="rounded-3xl border border-[var(--public-border)] bg-[var(--public-surface-raised)] p-6"
                         >
                             <span
                                 class="grid size-11 place-items-center rounded-xl bg-blue-100 text-blue-800"
@@ -419,15 +468,15 @@ const exploreCity = (city: string): void => {
 
             <section id="owners" class="mx-auto max-w-7xl px-5 py-24 sm:px-8">
                 <div
-                    class="relative overflow-hidden rounded-[2.5rem] bg-[#67d7ff] px-7 py-12 sm:px-12 lg:flex lg:items-center lg:justify-between lg:px-16"
+                    class="relative overflow-hidden rounded-[2.5rem] bg-primary px-7 py-12 text-primary-foreground sm:px-12 lg:flex lg:items-center lg:justify-between lg:px-16"
                 >
                     <Building2
-                        class="absolute -right-5 -bottom-10 size-52 text-[#123b6d]/10"
+                        class="absolute -right-5 -bottom-10 size-52 text-white/10"
                         :stroke-width="1"
                     />
                     <div class="relative max-w-2xl">
                         <p
-                            class="text-sm font-bold tracking-[0.16em] text-blue-900 uppercase"
+                            class="text-sm font-bold tracking-[0.16em] text-blue-100 uppercase"
                         >
                             {{
                                 tr(
@@ -437,7 +486,7 @@ const exploreCity = (city: string): void => {
                             }}
                         </p>
                         <h2
-                            class="mt-3 text-3xl font-semibold tracking-tight text-[#123b6d] sm:text-4xl"
+                            class="mt-3 text-3xl font-semibold tracking-tight text-primary-foreground sm:text-4xl"
                         >
                             {{
                                 tr(
@@ -446,7 +495,7 @@ const exploreCity = (city: string): void => {
                                 )
                             }}
                         </h2>
-                        <p class="mt-4 max-w-xl text-[#365441]">
+                        <p class="mt-4 max-w-xl text-blue-100">
                             {{
                                 tr(
                                     'Publica tu propiedad con fotos, precio y ubicación. Puedes guardarla como borrador antes de hacerla visible.',
@@ -457,7 +506,7 @@ const exploreCity = (city: string): void => {
                     </div>
                     <Link
                         :href="listPropertyUrl"
-                        class="relative mt-8 inline-flex items-center gap-2 rounded-full bg-[#123b6d] px-6 py-3.5 font-semibold text-white transition hover:bg-[#185a96] lg:mt-0"
+                        class="relative mt-8 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 font-semibold text-primary transition hover:bg-slate-100 lg:mt-0"
                     >
                         {{ tr('Publicar propiedad', 'List a property') }}
                         <ArrowRight class="size-4" />

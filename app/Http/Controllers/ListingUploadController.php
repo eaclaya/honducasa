@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Moderation\RecordModerationStrike;
+use App\Exceptions\ContentModerationUnavailableException;
+use App\Services\OpenAiContentModerator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Validation\ValidationException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 /**
@@ -16,13 +20,46 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  */
 class ListingUploadController extends Controller
 {
+    public function __construct(
+        private OpenAiContentModerator $contentModerator,
+        private RecordModerationStrike $recordModerationStrike,
+    ) {}
+
     public function store(Request $request): Response
     {
         $request->validate([
-            'file' => ['required', 'image', 'max:5120'],
+            'file' => [
+                'required',
+                'image',
+                'mimes:webp',
+                'mimetypes:image/webp',
+                'max:4096',
+                'dimensions:max_width=2560,max_height=2560',
+            ],
         ]);
 
-        $media = $request->user()->addMedia($request->file('file'))->toMediaCollection('pending-listing-photos');
+        $file = $request->file('file');
+
+        try {
+            if ($this->contentModerator->imageIsFlagged($file)) {
+                $this->recordModerationStrike->handle(
+                    $request->user(),
+                    'listing_image',
+                    'Automated image moderation flagged an uploaded listing photo.',
+                    ['filename' => $file->getClientOriginalName()],
+                );
+
+                throw ValidationException::withMessages([
+                    'file' => __('This image contains content that is not allowed.'),
+                ]);
+            }
+        } catch (ContentModerationUnavailableException) {
+            throw ValidationException::withMessages([
+                'file' => __('Content moderation is temporarily unavailable. Please try again.'),
+            ]);
+        }
+
+        $media = $request->user()->addMedia($file)->toMediaCollection('pending-listing-photos');
 
         return response((string) $media->id, 201);
     }

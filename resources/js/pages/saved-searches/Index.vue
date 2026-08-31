@@ -54,7 +54,14 @@ const tr = (es: string, en: string): string =>
                     </p>
                 </div>
                 <Link
-                    :href="rentals.url({ query: item.filters })"
+                    :href="
+                        rentals.url({
+                            query: {
+                                ...item.filters,
+                                saved_search: item.id,
+                            },
+                        })
+                    "
                     class="rounded-xl border px-4 py-2 text-sm font-semibold"
                     >{{ tr('Ver resultados', 'View results') }}</Link
                 ><button
