@@ -3,6 +3,7 @@
 namespace App\Actions\Users;
 
 use App\Actions\Notifications\NotifyAdministrators;
+use App\Actions\Notifications\NotifySubscriber;
 use App\Enums\SubscriptionStatus;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
@@ -26,6 +27,7 @@ class SubscribeToPlan
         });
 
         app(NotifyAdministrators::class)->ofPlanSubscription($subscription);
+        app(NotifySubscriber::class)->ofPlanChange($subscription);
 
         return $subscription;
     }

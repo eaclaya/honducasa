@@ -54,5 +54,9 @@
     "New message about :propertyName": "Nuevo mensaje sobre :propertyName",
     ":senderLabel sent you a message about :propertyName.": ":senderLabel te envió un mensaje sobre :propertyName.",
     "View conversation": "Ver conversación",
+    "Your plan is now :planName": "Tu plan ahora es :planName",
+    "Your subscription plan has been updated to :planName.": "Tu plan de suscripción se actualizó a :planName.",
+    "Manage your plan": "Administrar tu plan",
+    "Subscription updated": "Suscripción actualizada",
     "email": "correo electrónico"
 }
