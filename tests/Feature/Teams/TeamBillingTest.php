@@ -6,6 +6,8 @@ use App\Models\SubscriptionPlan;
 use App\Models\Team;
 use App\Models\TeamSubscription;
 use App\Models\User;
+use App\Notifications\PlanSubscriptionUpdated;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('a team owner can view the billing page with plans for their ladder', function () {
@@ -69,6 +71,26 @@ test('a team owner can subscribe to a plan', function () {
     expect($subscription)->not->toBeNull()
         ->and($subscription->subscription_plan_id)->toBe($plan->id)
         ->and($subscription->status)->toBe(SubscriptionStatus::Active);
+});
+
+test('subscribing to a plan emails the team owner a confirmation, not just any admin', function () {
+    Notification::fake();
+    $owner = User::factory()->create();
+    $admin = User::factory()->create();
+    $team = Team::factory()->create();
+    $team->members()->attach($owner, ['role' => TeamRole::Owner->value]);
+    $team->members()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $plan = SubscriptionPlan::factory()->create(['ladder' => 'agency', 'name' => 'Agency — Growth']);
+
+    $this->actingAs($admin)
+        ->post(route('teams.billing.update', $team), ['subscription_plan_id' => $plan->id])
+        ->assertRedirect();
+
+    Notification::assertSentTo($owner, PlanSubscriptionUpdated::class, function ($notification, $channels) {
+        return $notification->planName === 'Agency — Growth'
+            && in_array('mail', $channels, true);
+    });
+    Notification::assertNotSentTo($admin, PlanSubscriptionUpdated::class);
 });
 
 test('switching plans cancels the previous subscription instead of stacking rows', function () {

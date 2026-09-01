@@ -7,7 +7,9 @@ use App\Models\Property;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\UserSubscription;
+use App\Notifications\PlanSubscriptionUpdated;
 use App\Support\HondurasCityCoordinates;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -24,6 +26,25 @@ test('an individual can subscribe without creating a team', function () {
 
     expect(UserSubscription::query()->sole()->user_id)->toBe($user->id)
         ->and($user->fresh()->teams()->count())->toBe(0);
+});
+
+test('subscribing to a plan emails the individual a confirmation', function () {
+    Notification::fake();
+    $user = User::factory()->create();
+    $plan = SubscriptionPlan::factory()->create([
+        'ladder' => SubscriptionLadder::Individual,
+        'is_active' => true,
+        'name' => 'Individual — Plus',
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('billing.update'), ['subscription_plan_id' => $plan->id])
+        ->assertRedirect();
+
+    Notification::assertSentTo($user, PlanSubscriptionUpdated::class, function ($notification, $channels) {
+        return $notification->planName === 'Individual — Plus'
+            && in_array('mail', $channels, true);
+    });
 });
 
 test('the personal billing page only lists individual plans', function () {
