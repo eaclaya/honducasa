@@ -1,0 +1,202 @@
+<script setup lang="ts">
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Building2, Edit3, Plus, Trash2 } from '@lucide/vue';
+import { computed } from 'vue';
+import { create, destroy, edit } from '@/routes/listings';
+import {
+    create as createPersonal,
+    destroy as destroyPersonal,
+    edit as editPersonal,
+} from '@/routes/personal-listings';
+
+type Listing = {
+    id: number;
+    slug: string;
+    name: string | null;
+    status: string;
+    listingType: string;
+    priceAmount: number;
+    currency: string;
+    image: string | null;
+};
+type PaginationLink = {
+    url: string | null;
+    label: string;
+    active: boolean;
+};
+type PaginatedListings = {
+    data: Listing[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+    links: PaginationLink[];
+};
+defineProps<{ listings: PaginatedListings }>();
+const page = usePage();
+const locale = computed(() => page.props.locale);
+const tr = (es: string, en: string): string =>
+    locale.value === 'es' ? es : en;
+const team = computed(() => page.props.currentTeam!);
+const money = (item: Listing): string =>
+    new Intl.NumberFormat(locale.value === 'es' ? 'es-HN' : 'en-US', {
+        style: 'currency',
+        currency: item.currency,
+        maximumFractionDigits: 0,
+    }).format(item.priceAmount);
+const paginationLabel = (label: string): string =>
+    label
+        .replace('&laquo; Previous', tr('Anterior', 'Previous'))
+        .replace('Next &raquo;', tr('Siguiente', 'Next'));
+const remove = (item: Listing): void => {
+    if (confirm(tr('¿Eliminar esta propiedad?', 'Delete this listing?'))) {
+        router.delete(
+            team.value
+                ? destroy.url({
+                      current_team: team.value.slug,
+                      listing: item.id,
+                  })
+                : destroyPersonal.url(item.id),
+        );
+    }
+};
+</script>
+
+<template>
+    <Head :title="tr('Mis propiedades', 'My listings')" />
+    <div class="space-y-6 p-4 md:p-8">
+        <div
+            class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"
+        >
+            <div>
+                <h1 class="text-3xl font-semibold">
+                    {{ tr('Mis propiedades', 'My listings') }}
+                </h1>
+                <p class="mt-1 text-muted-foreground">
+                    {{
+                        tr(
+                            'Administra borradores y publicaciones activas.',
+                            'Manage drafts and active listings.',
+                        )
+                    }}
+                </p>
+            </div>
+            <Link
+                :href="team ? create.url(team.slug) : createPersonal().url"
+                class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground"
+                ><Plus class="size-5" />{{
+                    tr('Nueva propiedad', 'New listing')
+                }}</Link
+            >
+        </div>
+        <div
+            v-if="listings.data.length"
+            class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
+        >
+            <article
+                v-for="item in listings.data"
+                :key="item.id"
+                class="overflow-hidden rounded-2xl border bg-card"
+            >
+                <img
+                    v-if="item.image"
+                    :src="item.image"
+                    :alt="item.name ?? ''"
+                    class="aspect-video w-full object-cover"
+                />
+                <div
+                    v-else
+                    class="grid aspect-video place-items-center bg-blue-50 text-blue-700"
+                >
+                    <Building2 class="size-12" />
+                </div>
+                <div class="p-5">
+                    <div class="flex items-center justify-between gap-3">
+                        <span
+                            class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800"
+                            >{{ item.status }}</span
+                        ><b
+                            >{{ money(item)
+                            }}<small v-if="item.listingType === 'rent'"
+                                >/mes</small
+                            ></b
+                        >
+                    </div>
+                    <h2 class="mt-4 text-lg font-semibold">{{ item.name }}</h2>
+                    <div class="mt-5 flex gap-2">
+                        <Link
+                            :href="
+                                team
+                                    ? edit.url({
+                                          current_team: team.slug,
+                                          listing: item.id,
+                                      })
+                                    : editPersonal.url(item.id)
+                            "
+                            class="flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold"
+                            ><Edit3 class="size-4" />{{
+                                tr('Editar', 'Edit')
+                            }}</Link
+                        ><button
+                            class="rounded-xl border px-3 text-destructive"
+                            @click="remove(item)"
+                        >
+                            <Trash2 class="size-4" />
+                        </button>
+                    </div>
+                </div>
+            </article>
+        </div>
+        <div
+            v-if="listings.data.length && listings.last_page > 1"
+            class="flex flex-col items-center gap-4"
+        >
+            <p class="text-sm text-muted-foreground">
+                {{
+                    tr(
+                        `Mostrando ${listings.from}–${listings.to} de ${listings.total}`,
+                        `Showing ${listings.from}–${listings.to} of ${listings.total}`,
+                    )
+                }}
+            </p>
+            <nav
+                class="flex flex-wrap justify-center gap-2"
+                :aria-label="tr('Páginas de propiedades', 'Listing pages')"
+            >
+                <template v-for="link in listings.links" :key="link.label">
+                    <Link
+                        v-if="link.url"
+                        :href="link.url"
+                        preserve-scroll
+                        class="grid min-w-10 place-items-center rounded-xl border px-3 py-2 text-sm font-semibold transition"
+                        :class="
+                            link.active
+                                ? 'border-primary bg-primary text-primary-foreground'
+                                : 'hover:border-primary'
+                        "
+                        :aria-current="link.active ? 'page' : undefined"
+                        >{{ paginationLabel(link.label) }}</Link
+                    >
+                    <span
+                        v-else
+                        class="grid min-w-10 place-items-center rounded-xl border px-3 py-2 text-sm text-muted-foreground"
+                        >{{ paginationLabel(link.label) }}</span
+                    >
+                </template>
+            </nav>
+        </div>
+        <div
+            v-if="!listings.data.length"
+            class="grid min-h-80 place-items-center rounded-2xl border border-dashed text-center"
+        >
+            <div>
+                <Building2 class="mx-auto size-12 text-blue-600" />
+                <h2 class="mt-4 text-xl font-semibold">
+                    {{ tr('Aún no tienes propiedades', 'No listings yet') }}
+                </h2>
+            </div>
+        </div>
+    </div>
+</template>

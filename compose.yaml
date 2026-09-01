@@ -1,0 +1,120 @@
+name: honducasa
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6381:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  database:
+    image: postgis/postgis:17-3.5
+    platform: linux/amd64
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: honducasa
+      POSTGRES_USER: honducasa
+      POSTGRES_PASSWORD: honducasa
+    ports:
+      - '127.0.0.1:55432:5432'
+    volumes:
+      - database-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  database-testing:
+    image: postgis/postgis:17-3.5
+    platform: linux/amd64
+    profiles: ['testing']
+    environment:
+      POSTGRES_DB: honducasa_testing
+      POSTGRES_USER: honducasa
+      POSTGRES_PASSWORD: honducasa
+    ports:
+      - '127.0.0.1:55433:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+
+  # Local SMTP catcher — mail sent by the app in dev lands here instead of a
+  # real inbox. Web UI at http://127.0.0.1:8026; SMTP on 2525 (matches
+  # MAIL_HOST/MAIL_PORT in .env).
+  mailpit:
+    image: axllent/mailpit
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:2525:1025'
+      - '127.0.0.1:8026:8025'
+
+  # Runs the queue worker so it doesn't depend on someone starting
+  # `php artisan horizon` by hand — the app itself still runs natively via
+  # Herd, only the worker runs in Docker. Reads `.env` for everything (APP_KEY,
+  # etc.) but overrides the host-relative connection settings, since `.env`
+  # points at 127.0.0.1:<host-mapped-port> for Herd's native PHP, which isn't
+  # reachable from inside a container — here the other services are reached
+  # by their compose service name on the container-internal port instead.
+  horizon:
+    build:
+      context: .
+      dockerfile: docker/horizon/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - .:/var/www/html
+    env_file:
+      - .env
+    environment:
+      DB_HOST: database
+      DB_PORT: '5432'
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      MAIL_HOST: mailpit
+      MAIL_PORT: '1025'
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Self-hosted location search (see PropertyLocationPicker.vue and
+  # PlaceSearchController) — Mapbox's own geocoding data for Honduras is too thin
+  # for real places (colonias, hospitals, landmarks), so search is proxied through
+  # this instead. Reachable over plain HTTP via NOMINATIM_URL, so the Laravel app
+  # never needs to run in the same container/host as this — works the same
+  # locally (via Herd) and later on whatever production host is chosen.
+  #
+  # First start imports the Honduras OSM extract (~70MB) and takes ~15-30 minutes;
+  # watch `docker compose logs -f nominatim` until it reports readiness.
+  nominatim:
+    image: mediagis/nominatim:5.3.2
+    restart: unless-stopped
+    shm_size: 1gb
+    ports:
+      - '127.0.0.1:8089:8080'
+    environment:
+      PBF_URL: https://download.geofabrik.de/central-america/honduras-latest.osm.pbf
+      REPLICATION_URL: https://download.geofabrik.de/central-america/honduras-updates/
+      IMPORT_WIKIPEDIA: 'false'
+      NOMINATIM_PASSWORD: nominatim
+    volumes:
+      - nominatim-data:/var/lib/postgresql/16/main
+
+volumes:
+  database-data:
+  nominatim-data:
+  redis-data:

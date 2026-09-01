@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Admin — Usuarios</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+  @theme {
+    --color-background: hsl(0 0% 100%);
+    --color-foreground: hsl(0 0% 3.9%);
+    --color-card: hsl(0 0% 100%);
+    --color-primary: hsl(211 72% 28%);
+    --color-primary-foreground: hsl(0 0% 98%);
+    --color-secondary: hsl(0 0% 92.1%);
+    --color-muted: hsl(0 0% 96.1%);
+    --color-muted-foreground: hsl(0 0% 45.1%);
+    --color-accent: hsl(202 100% 95%);
+    --color-accent-foreground: hsl(211 72% 24%);
+    --color-destructive: hsl(0 84.2% 60.2%);
+    --color-border: hsl(0 0% 92.8%);
+    --color-sidebar: hsl(0 0% 98%);
+    --color-sidebar-accent: hsl(202 70% 94%);
+    --color-sidebar-accent-foreground: hsl(211 72% 24%);
+  }
+  @layer base {
+    *, ::before, ::after { border-color: var(--color-border); }
+    body { background: var(--color-background); color: var(--color-foreground); }
+  }
+</style>
+</head>
+<body class="text-[15px] antialiased">
+
+<svg class="hidden">
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-message" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-building" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M8 10h.01M16 10h.01M8 14h.01M16 14h.01"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V6l8-3 8 3z"/><path d="M12 8v4M12 16h.01"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-chevL" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-chevR" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+</svg>
+
+<div class="flex min-h-screen">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="hidden w-64 shrink-0 border-r bg-sidebar lg:block">
+    <div class="flex h-16 items-center gap-2.5 px-5">
+      <div class="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground font-bold">H</div>
+      <span class="font-semibold">Honducasa</span>
+    </div>
+    <nav class="space-y-1 px-3 pb-4">
+      <a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"><svg class="size-4"><use href="#i-grid"/></svg>Panel</a>
+      <a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"><svg class="size-4"><use href="#i-search"/></svg>Buscar</a>
+      <a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"><svg class="size-4"><use href="#i-message"/></svg>Mensajes<span class="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-bold text-primary-foreground">3</span></a>
+      <a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"><svg class="size-4"><use href="#i-bell"/></svg>Notificaciones</a>
+
+      <p class="px-3 pt-5 pb-1 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">Administración</p>
+      <a href="users.html" class="flex items-center gap-3 rounded-lg bg-sidebar-accent px-3 py-2 text-sm font-semibold text-sidebar-accent-foreground"><svg class="size-4"><use href="#i-users"/></svg>Usuarios</a>
+      <a href="teams.html" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"><svg class="size-4"><use href="#i-building"/></svg>Equipos</a>
+      <a href="properties.html" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"><svg class="size-4"><use href="#i-home"/></svg>Propiedades</a>
+      <a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"><svg class="size-4"><use href="#i-shield"/></svg>Moderación<span class="ml-auto rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold text-white">2</span></a>
+    </nav>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="min-w-0 flex-1">
+    <div class="space-y-6 p-4 md:p-8">
+
+      <div>
+        <h1 class="flex items-center gap-3 text-3xl font-semibold">
+          <svg class="size-8 text-primary"><use href="#i-users"/></svg>Usuarios
+        </h1>
+        <p class="mt-1 text-muted-foreground">Todas las cuentas de la plataforma: arrendadores, inquilinos y administradores.</p>
+      </div>
+
+      <!-- Role facets. A user can be landlord AND renter, so these are filters, not exclusive buckets. -->
+      <div class="flex flex-wrap gap-2 border-b pb-3">
+        <button class="rounded-full bg-primary px-3.5 py-1.5 text-sm font-semibold text-primary-foreground">Todos <span class="opacity-70">1,284</span></button>
+        <button class="rounded-full px-3.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted">Arrendadores <span class="opacity-70">212</span></button>
+        <button class="rounded-full px-3.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted">Inquilinos <span class="opacity-70">1,109</span></button>
+        <button class="rounded-full px-3.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted">Administradores <span class="opacity-70">3</span></button>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="flex flex-wrap items-end gap-3 rounded-2xl border bg-card p-4">
+        <label class="min-w-64 flex-1 text-xs font-semibold text-muted-foreground">Buscar
+          <div class="relative mt-1.5">
+            <svg class="pointer-events-none absolute top-2.5 left-3 size-4 text-muted-foreground"><use href="#i-search"/></svg>
+            <input value="lopez" class="w-full rounded-xl border bg-background py-2 pr-3 pl-9 text-sm text-foreground">
+          </div>
+        </label>
+        <label class="text-xs font-semibold text-muted-foreground">Verificación
+          <select class="mt-1.5 block rounded-xl border bg-background px-3 py-2 text-sm text-foreground"><option>Todas</option><option>Verificados</option><option>Sin verificar</option></select>
+        </label>
+        <label class="text-xs font-semibold text-muted-foreground">Registro
+          <select class="mt-1.5 block rounded-xl border bg-background px-3 py-2 text-sm text-foreground"><option>Cualquier fecha</option><option>Últimos 7 días</option><option>Últimos 30 días</option></select>
+        </label>
+        <label class="text-xs font-semibold text-muted-foreground">Ordenar por
+          <select class="mt-1.5 block rounded-xl border bg-background px-3 py-2 text-sm text-foreground"><option>Más recientes</option><option>Más conversaciones</option><option>Nombre A–Z</option></select>
+        </label>
+        <button class="rounded-xl border px-4 py-2 text-sm font-semibold">Limpiar</button>
+      </div>
+
+      <!-- Table -->
+      <div class="overflow-hidden rounded-2xl border bg-card">
+        <table class="w-full text-sm">
+          <thead class="border-b bg-muted/50 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            <tr>
+              <th class="px-5 py-3">Usuario</th>
+              <th class="px-5 py-3">Rol</th>
+              <th class="px-5 py-3 text-center">Equipos</th>
+              <th class="px-5 py-3 text-center">Conv.</th>
+              <th class="px-5 py-3 text-center">Favoritos</th>
+              <th class="px-5 py-3">Registro</th>
+              <th class="px-5 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y">
+
+            <tr class="hover:bg-muted/40">
+              <td class="px-5 py-3.5">
+                <div class="flex items-center gap-3">
+                  <div class="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-accent-foreground">AL</div>
+                  <div class="min-w-0">
+                    <p class="font-semibold">Ana López</p>
+                    <p class="flex items-center gap-1.5 truncate text-xs text-muted-foreground">ana.lopez@gmail.com
+                      <span title="Correo verificado" class="grid size-3.5 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><svg class="size-2.5"><use href="#i-check"/></svg></span>
+                    </p>
+                  </div>
+                </div>
+              </td>
+              <!-- Both facets at once: the case a separate "Renters" screen would misrepresent. -->
+              <td class="px-5 py-3.5"><span class="rounded-full bg-accent px-2.5 py-1 text-[11px] font-bold text-accent-foreground uppercase">Arrendador</span> <span class="rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold text-muted-foreground uppercase">Inquilino</span></td>
+              <td class="px-5 py-3.5 text-center font-medium">1</td>
+              <td class="px-5 py-3.5 text-center font-medium">4</td>
+              <td class="px-5 py-3.5 text-center font-medium">12</td>
+              <td class="px-5 py-3.5 whitespace-nowrap text-muted-foreground">12 mar 2026</td>
+              <td class="px-5 py-3.5 text-right"><button class="rounded-lg p-1.5 hover:bg-muted"><svg class="size-4 text-muted-foreground"><use href="#i-dots"/></svg></button></td>
+            </tr>
+
+            <tr class="hover:bg-muted/40">
+              <td class="px-5 py-3.5">
+                <div class="flex items-center gap-3">
+                  <div class="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-accent-foreground">MD</div>
+                  <div class="min-w-0">
+                    <p class="font-semibold">María Fernanda Discua</p>
+                    <p class="flex items-center gap-1.5 truncate text-xs text-muted-foreground">maria.discua@valle.hn
+                      <span title="Correo verificado" class="grid size-3.5 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><svg class="size-2.5"><use href="#i-check"/></svg></span>
+                    </p>
+                  </div>
+                </div>
+              </td>
+              <td class="px-5 py-3.5"><span class="rounded-full bg-accent px-2.5 py-1 text-[11px] font-bold text-accent-foreground uppercase">Arrendador</span></td>
+              <td class="px-5 py-3.5 text-center font-medium">2</td>
+              <td class="px-5 py-3.5 text-center font-medium">128</td>
+              <td class="px-5 py-3.5 text-center font-medium">0</td>
+              <td class="px-5 py-3.5 whitespace-nowrap text-muted-foreground">04 feb 2026</td>
+              <td class="px-5 py-3.5 text-right"><button class="rounded-lg p-1.5 hover:bg-muted"><svg class="size-4 text-muted-foreground"><use href="#i-dots"/></svg></button></td>
+            </tr>
+
+            <!-- Row with an open action menu, to show what admins can actually do. -->
+            <tr class="relative bg-muted/40">
+              <td class="px-5 py-3.5">
+                <div class="flex items-center gap-3">
+                  <div class="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-foreground">RC</div>
+                  <div class="min-w-0">
+                    <p class="font-semibold">Roberto Cáceres</p>
+                    <p class="flex items-center gap-1.5 truncate text-xs text-muted-foreground">roberto@honducasa.hn
+                      <span title="Correo verificado" class="grid size-3.5 shrink-0 place-items-center rounded-full bg-emerald-600 text-white"><svg class="size-2.5"><use href="#i-check"/></svg></span>
+                    </p>
+                  </div>
+                </div>
+              </td>
+              <td class="px-5 py-3.5"><span class="rounded-full bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground uppercase">Admin</span></td>
+              <td class="px-5 py-3.5 text-center font-medium">1</td>
+              <td class="px-5 py-3.5 text-center font-medium">0</td>
+              <td class="px-5 py-3.5 text-center font-medium">2</td>
+              <td class="px-5 py-3.5 whitespace-nowrap text-muted-foreground">18 ene 2026</td>
+              <td class="px-5 py-3.5 text-right">
+                <div class="relative inline-block">
+                  <button class="rounded-lg bg-secondary p-1.5"><svg class="size-4"><use href="#i-dots"/></svg></button>
+                  <div class="absolute top-full right-0 z-10 mt-1 w-60 overflow-hidden rounded-xl border bg-card text-left shadow-xl">
+                    <a href="#" class="block px-4 py-2.5 text-sm hover:bg-muted">Ver detalle</a>
+                    <a href="teams.html" class="block px-4 py-2.5 text-sm hover:bg-muted">Ver sus equipos</a>
+                    <div class="border-t"></div>
+                    <span class="block cursor-not-allowed px-4 py-2.5 text-sm text-muted-foreground">Quitar administrador
+                      <small class="mt-0.5 block text-[11px] leading-tight text-destructive">No puedes quitarte el acceso a ti mismo.</small>
+                    </span>
+                  </div>
+                </div>
+              </td>
+            </tr>
+
+            <tr class="hover:bg-muted/40">
+              <td class="px-5 py-3.5">
+                <div class="flex items-center gap-3">
+                  <div class="grid size-9 shrink-0 place-items-center rounded-full bg-muted text-sm font-bold text-muted-foreground">CM</div>
+                  <div class="min-w-0">
+                    <p class="font-semibold">Carlos Mejía</p>
+                    <p class="truncate text-xs text-muted-foreground">carlos.mejia@outlook.com</p>
+                  </div>
+                </div>
+              </td>
+              <td class="px-5 py-3.5"><span class="rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold text-muted-foreground uppercase">Inquilino</span></td>
+              <td class="px-5 py-3.5 text-center font-medium">0</td>
+              <td class="px-5 py-3.5 text-center font-medium">9</td>
+              <td class="px-5 py-3.5 text-center font-medium">31</td>
+              <td class="px-5 py-3.5 whitespace-nowrap text-muted-foreground">27 jun 2026</td>
+              <td class="px-5 py-3.5 text-right"><button class="rounded-lg p-1.5 hover:bg-muted"><svg class="size-4 text-muted-foreground"><use href="#i-dots"/></svg></button></td>
+            </tr>
+
+            <tr class="hover:bg-muted/40">
+              <td class="px-5 py-3.5">
+                <div class="flex items-center gap-3">
+                  <div class="grid size-9 shrink-0 place-items-center rounded-full bg-muted text-sm font-bold text-muted-foreground">EZ</div>
+                  <div class="min-w-0">
+                    <p class="font-semibold">Elena Zambrano</p>
+                    <p class="flex items-center gap-1.5 truncate text-xs text-muted-foreground">elena.z@yahoo.com
+                      <span class="rounded bg-amber-100 px-1.5 text-[10px] font-bold text-amber-800 uppercase">Sin verificar</span>
+                    </p>
+                  </div>
+                </div>
+              </td>
+              <td class="px-5 py-3.5"><span class="rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold text-muted-foreground uppercase">Inquilino</span></td>
+              <td class="px-5 py-3.5 text-center font-medium">0</td>
+              <td class="px-5 py-3.5 text-center font-medium">1</td>
+              <td class="px-5 py-3.5 text-center font-medium">3</td>
+              <td class="px-5 py-3.5 whitespace-nowrap text-muted-foreground">02 ago 2026</td>
+              <td class="px-5 py-3.5 text-right"><button class="rounded-lg p-1.5 hover:bg-muted"><svg class="size-4 text-muted-foreground"><use href="#i-dots"/></svg></button></td>
+            </tr>
+
+          </tbody>
+        </table>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-sm">
+          <p class="text-muted-foreground">Mostrando <b class="text-foreground">1–30</b> de <b class="text-foreground">1,284</b></p>
+          <div class="flex items-center gap-1">
+            <button class="grid size-9 place-items-center rounded-lg border text-muted-foreground opacity-40"><svg class="size-4"><use href="#i-chevL"/></svg></button>
+            <button class="size-9 rounded-lg bg-primary font-semibold text-primary-foreground">1</button>
+            <button class="size-9 rounded-lg border font-medium hover:bg-muted">2</button>
+            <button class="size-9 rounded-lg border font-medium hover:bg-muted">3</button>
+            <span class="px-1 text-muted-foreground">…</span>
+            <button class="size-9 rounded-lg border font-medium hover:bg-muted">43</button>
+            <button class="grid size-9 place-items-center rounded-lg border hover:bg-muted"><svg class="size-4"><use href="#i-chevR"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-xs text-muted-foreground">Mockup estático · <a class="underline" href="teams.html">Equipos</a> · <a class="underline" href="properties.html">Propiedades</a></p>
+    </div>
+  </main>
+</div>
+</body>
+</html>

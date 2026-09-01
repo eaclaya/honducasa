@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockups · Consola de administración</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+  @theme {
+    --color-background: hsl(0 0% 100%);
+    --color-foreground: hsl(0 0% 3.9%);
+    --color-card: hsl(0 0% 100%);
+    --color-primary: hsl(211 72% 28%);
+    --color-primary-foreground: hsl(0 0% 98%);
+    --color-muted: hsl(0 0% 96.1%);
+    --color-muted-foreground: hsl(0 0% 45.1%);
+    --color-accent: hsl(202 100% 95%);
+    --color-accent-foreground: hsl(211 72% 24%);
+    --color-border: hsl(0 0% 92.8%);
+  }
+  @layer base {
+    *, ::before, ::after { border-color: var(--color-border); }
+    body { background: var(--color-background); color: var(--color-foreground); }
+  }
+</style>
+</head>
+<body class="antialiased">
+  <div class="mx-auto max-w-3xl p-8">
+    <div class="flex items-center gap-3">
+      <div class="grid size-11 place-items-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">H</div>
+      <div>
+        <h1 class="text-2xl font-semibold">Consola de administración</h1>
+        <p class="text-sm text-muted-foreground">Mockups estáticos · datos ficticios</p>
+      </div>
+    </div>
+
+    <div class="mt-8 space-y-3">
+      <a href="users.html" class="block rounded-2xl border bg-card p-5 hover:bg-muted/40">
+        <h2 class="font-semibold">Usuarios <span class="text-muted-foreground">/admin/users</span></h2>
+        <p class="mt-1 text-sm text-muted-foreground">Una sola pantalla con facetas de rol. Muestra un usuario que es arrendador e inquilino a la vez, y el menú de acciones con la auto-degradación bloqueada.</p>
+      </a>
+      <a href="teams.html" class="block rounded-2xl border bg-card p-5 hover:bg-muted/40">
+        <h2 class="font-semibold">Equipos <span class="text-muted-foreground">/admin/teams</span></h2>
+        <p class="mt-1 text-sm text-muted-foreground">Conteos por equipo, equipo eliminado (soft delete) con opción de restaurar, y una vista previa del detalle con miembros, propiedades e invitaciones.</p>
+      </a>
+      <a href="properties.html" class="block rounded-2xl border bg-card p-5 hover:bg-muted/40">
+        <h2 class="font-semibold">Propiedades <span class="text-muted-foreground">/admin/properties</span></h2>
+        <p class="mt-1 text-sm text-muted-foreground">Inventario global con todos los estados. Incluye el caso de una propiedad sin fotos donde «Publicar» aparece deshabilitado.</p>
+      </a>
+    </div>
+
+    <p class="mt-8 rounded-xl bg-accent p-4 text-sm text-accent-foreground">
+      Archivos estáticos en <code class="font-mono">public/mockups/</code>. No forman parte de la aplicación y se pueden borrar con
+      <code class="font-mono">rm -rf public/mockups</code>.
+    </p>
+  </div>
+</body>
+</html>
