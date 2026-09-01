@@ -123,15 +123,20 @@ jobs:
           composer install --no-dev --classmap-authoritative --no-interaction --prefer-dist --no-progress
           npm ci
           npm run build
+          # The archive must not be written inside the tree it's archiving:
+          # GNU tar stats each directory before and after reading it, and a
+          # release.tar.gz created inside "." while tar is still traversing
+          # changes "."'s mtime mid-read, which tar reports as "file changed
+          # as we read it" and exits non-zero — even though --exclude keeps
+          # the file itself out of the archive's contents.
           tar \
             --exclude=.env \
             --exclude=.git \
             --exclude=.github \
             --exclude=node_modules \
-            --exclude=release.tar.gz \
             --exclude=storage \
             --exclude=tests \
-            -czf release.tar.gz .
+            -czf "$RUNNER_TEMP/release.tar.gz" .
 
       - name: Configure SSH
         env:
@@ -152,7 +157,7 @@ jobs:
 
       - name: Upload release
         run: >-
-          scp -P "$DEPLOY_PORT" release.tar.gz
+          scp -P "$DEPLOY_PORT" "$RUNNER_TEMP/release.tar.gz"
           "$DEPLOY_USER@$DEPLOY_HOST:/tmp/honducasa-${GITHUB_SHA}.tar.gz"
 
       - name: Activate release
