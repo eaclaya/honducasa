@@ -99,7 +99,9 @@ const sourceLabel = (source: string): string =>
             </p>
         </div>
 
-        <label class="block max-w-xl text-xs font-semibold text-muted-foreground">
+        <label
+            class="block max-w-xl text-xs font-semibold text-muted-foreground"
+        >
             {{ tr('Buscar', 'Search') }}
             <div class="relative mt-1.5">
                 <Search
@@ -123,17 +125,21 @@ const sourceLabel = (source: string): string =>
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-lg font-semibold">{{ user.name }}</h2>
+                            <h2 class="text-lg font-semibold">
+                                {{ user.name }}
+                            </h2>
                             <span
                                 class="rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-bold text-destructive"
                             >
                                 {{ user.activeStrikesCount }}/3
-                                {{ tr('infracciones activas', 'active strikes') }}
+                                {{
+                                    tr('infracciones activas', 'active strikes')
+                                }}
                             </span>
                         </div>
                         <p class="text-sm text-muted-foreground">
-                            {{ user.email }} ·
-                            {{ tr('Bloqueado', 'Blocked') }} {{ user.blockedAt }}
+                            {{ user.email }} · {{ tr('Bloqueado', 'Blocked') }}
+                            {{ user.blockedAt }}
                         </p>
                         <p class="mt-3 font-medium text-destructive">
                             {{ user.blockedReason }}
@@ -179,7 +185,12 @@ const sourceLabel = (source: string): string =>
             <div>
                 <ShieldBan class="mx-auto size-12 text-emerald-600" />
                 <h2 class="mt-4 text-xl font-semibold text-foreground">
-                    {{ tr('La lista negra está vacía', 'The blacklist is empty') }}
+                    {{
+                        tr(
+                            'La lista negra está vacía',
+                            'The blacklist is empty',
+                        )
+                    }}
                 </h2>
             </div>
         </div>
@@ -216,7 +227,10 @@ const sourceLabel = (source: string): string =>
                     required
                 />
             </label>
-            <p v-if="unblockForm.errors.reason" class="mt-1 text-sm text-destructive">
+            <p
+                v-if="unblockForm.errors.reason"
+                class="mt-1 text-sm text-destructive"
+            >
                 {{ unblockForm.errors.reason }}
             </p>
             <div class="mt-6 flex justify-end gap-2">

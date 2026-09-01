@@ -26,10 +26,6 @@ import ListingPublishModal from '@/components/ListingPublishModal.vue';
 import PropertyLocationPicker from '@/components/PropertyLocationPicker.vue';
 import { index, store, update } from '@/routes/listings';
 import {
-    preview as propertyPreview,
-    show as propertyShow,
-} from '@/routes/properties';
-import {
     destroy as destroyUpload,
     enhance as enhanceUpload,
     enhancementStatus,
@@ -40,6 +36,10 @@ import {
     store as personalStore,
     update as personalUpdate,
 } from '@/routes/personal-listings';
+import {
+    preview as propertyPreview,
+    show as propertyShow,
+} from '@/routes/properties';
 
 const FilePond = vueFilePond(
     FilePondPluginImagePreview,
