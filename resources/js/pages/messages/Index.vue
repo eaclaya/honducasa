@@ -117,8 +117,8 @@ watch(() => props.selected?.messages.length, scrollToLatest);
             <p class="mt-1 text-muted-foreground">
                 {{
                     tr(
-                        'Conversa dentro de HonduCasa sin compartir datos personales.',
-                        'Chat inside HonduCasa without sharing personal contact details.',
+                        'Conversa dentro de Honducasa sin compartir datos personales.',
+                        'Chat inside Honducasa without sharing personal contact details.',
                     )
                 }}
             </p>

@@ -556,10 +556,31 @@ const cardTone = (index: number): string =>
         'from-orange-200 via-amber-100 to-stone-100',
         'from-violet-200 via-rose-100 to-orange-100',
     ][index % 4];
+
+const seoTitle = 'Propiedades en alquiler y venta en Honduras';
+const seoDescription =
+    'Busca casas, apartamentos y propiedades disponibles en Honduras por ubicación, precio y características.';
+const canonicalUrl = computed(() =>
+    typeof window === 'undefined'
+        ? page.url
+        : new URL(page.url, window.location.origin).href,
+);
 </script>
 
 <template>
-    <Head title="Property search" />
+    <Head :title="seoTitle">
+        <meta name="description" :content="seoDescription" />
+        <link rel="canonical" :href="canonicalUrl" />
+        <meta property="og:locale" content="es_HN" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Honducasa" />
+        <meta property="og:title" :content="seoTitle" />
+        <meta property="og:description" :content="seoDescription" />
+        <meta property="og:url" :content="canonicalUrl" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" :content="seoTitle" />
+        <meta name="twitter:description" :content="seoDescription" />
+    </Head>
 
     <div
         class="public-site min-h-screen bg-[var(--public-surface)] text-[var(--public-text)]"

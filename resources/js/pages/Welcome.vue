@@ -4,7 +4,9 @@ import {
     ArrowRight,
     Building2,
     CheckCircle2,
+    Heart,
     MapPin,
+    MessageCircle,
     Search,
     ShieldCheck,
 } from '@lucide/vue';
@@ -34,6 +36,20 @@ const location = ref('');
 const listingType = ref('rent');
 const locating = ref(false);
 const locationError = ref('');
+const audience = ref<'renters' | 'owners'>('renters');
+const seoTitle = 'Casas y apartamentos en alquiler y venta en Honduras';
+const seoDescription =
+    'Encuentra casas, apartamentos y propiedades en alquiler o venta en Honduras. Explora opciones en Tegucigalpa, San Pedro Sula, Comayagua y más.';
+const canonicalUrl = computed(() =>
+    typeof window === 'undefined'
+        ? page.url
+        : new URL(page.url, window.location.origin).href,
+);
+const seoImageUrl = computed(() =>
+    typeof window === 'undefined'
+        ? '/images/honducasa-hero.jpg'
+        : new URL('/images/honducasa-hero.jpg', window.location.origin).href,
+);
 
 const listPropertyUrl = computed(() => {
     if (page.props.currentTeam) {
@@ -96,7 +112,21 @@ const exploreCity = (city: string): void => {
 </script>
 
 <template>
-    <Head title="Homes for rent and sale in Honduras" />
+    <Head :title="seoTitle">
+        <meta name="description" :content="seoDescription" />
+        <link rel="canonical" :href="canonicalUrl" />
+        <meta property="og:locale" content="es_HN" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Honducasa" />
+        <meta property="og:title" :content="seoTitle" />
+        <meta property="og:description" :content="seoDescription" />
+        <meta property="og:url" :content="canonicalUrl" />
+        <meta property="og:image" :content="seoImageUrl" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" :content="seoTitle" />
+        <meta name="twitter:description" :content="seoDescription" />
+        <meta name="twitter:image" :content="seoImageUrl" />
+    </Head>
 
     <div
         class="public-site min-h-screen bg-[var(--public-surface)] text-[var(--public-text)] selection:bg-blue-200"
@@ -185,7 +215,6 @@ const exploreCity = (city: string): void => {
                         <div
                             class="mt-5 flex flex-wrap items-center justify-center gap-2 text-sm font-medium text-white [text-shadow:0_1px_5px_rgb(0_0_0/0.9)]"
                         >
-                            <span>{{ tr('Prueba:', 'Try:') }}</span>
                             <button
                                 class="rounded-full border border-white/45 bg-black/25 px-3 py-1.5 text-white backdrop-blur-sm transition hover:border-white hover:bg-black/40"
                                 @click="exploreCity('Tegucigalpa')"
@@ -200,9 +229,9 @@ const exploreCity = (city: string): void => {
                             </button>
                             <button
                                 class="rounded-full border border-white/45 bg-black/25 px-3 py-1.5 text-white backdrop-blur-sm transition hover:border-white hover:bg-black/40"
-                                @click="exploreCity('Roatán')"
+                                @click="exploreCity('Comayagua')"
                             >
-                                Roatán
+                                Comayagua
                             </button>
                         </div>
                     </div>
@@ -332,38 +361,46 @@ const exploreCity = (city: string): void => {
                         v-for="place in [
                             {
                                 name: 'Tegucigalpa',
+                                image: '/images/tegucigalpa-1.jpg',
                                 note: tr(
                                     'Energía capitalina y vida entre colinas',
                                     'Capital energy & hillside living',
                                 ),
-                                tone: 'from-[#2f6c52] to-[#86a27a]',
                             },
                             {
                                 name: 'San Pedro Sula',
+                                image: '/images/sps-1.jpg',
                                 note: tr(
                                     'Comodidad urbana y oportunidades',
                                     'Urban convenience & opportunity',
                                 ),
-                                tone: 'from-[#91684b] to-[#d1aa72]',
                             },
                             {
-                                name: 'Roatán',
+                                name: 'Comayagua',
+                                image: '/images/comayagua-1.jpg',
                                 note: tr(
-                                    'Vida isleña junto al Caribe',
-                                    'Island life by the Caribbean',
+                                    'Historia colonial en el corazón de Honduras',
+                                    'Colonial history in the heart of Honduras',
                                 ),
-                                tone: 'from-[#227b78] to-[#6fc5b3]',
                             },
                         ]"
                         :key="place.name"
-                        class="group relative min-h-72 overflow-hidden rounded-[2rem] bg-gradient-to-br p-7 text-left text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
-                        :class="place.tone"
+                        class="group relative min-h-80 overflow-hidden rounded-[2rem] border border-white/10 bg-stone-900 text-left text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl md:aspect-[1.05] md:min-h-0"
                         @click="exploreCity(place.name)"
                     >
-                        <div
-                            class="absolute -right-12 -bottom-16 size-52 rounded-full border-[42px] border-white/10 transition group-hover:scale-110"
+                        <img
+                            :src="place.image"
+                            :alt="place.name"
+                            class="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-105"
                         />
-                        <MapPin class="size-7" />
+                        <div
+                            class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/10"
+                        />
+                        <span
+                            class="absolute top-7 left-7 grid size-14 place-items-center rounded-full border border-white/25 bg-black/20 shadow-lg backdrop-blur-md"
+                        >
+                            <MapPin class="size-6" />
+                        </span>
                         <div class="absolute right-7 bottom-7 left-7">
                             <h3 class="text-2xl font-semibold">
                                 {{ place.name }}
@@ -378,103 +415,217 @@ const exploreCity = (city: string): void => {
 
             <section
                 id="how-it-works"
-                class="border-y border-[var(--public-border)] bg-[var(--public-surface-raised)]"
+                class="mx-auto max-w-[1440px] px-5 pt-10 sm:px-8"
             >
                 <div
-                    class="mx-auto grid max-w-7xl gap-14 px-5 py-24 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:items-center"
+                    class="rounded-[2rem] bg-[var(--public-surface)] px-5 py-12 sm:px-10 lg:px-14"
                 >
-                    <div>
+                    <div class="mx-auto max-w-3xl text-center">
                         <p
                             class="text-sm font-bold tracking-[0.16em] text-blue-700 uppercase"
                         >
                             {{
                                 tr(
-                                    'Creado para el mercado local',
-                                    'Built for the local market',
+                                    'Cómo funciona Honducasa',
+                                    'How Honducasa works',
                                 )
                             }}
                         </p>
                         <h2
-                            class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl"
+                            class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl"
                         >
                             {{
                                 tr(
-                                    'Menos dudas. Más confianza.',
-                                    'Less guessing. More confidence.',
+                                    'Más valor para inquilinos y propietarios',
+                                    'More value for renters and owners',
                                 )
                             }}
                         </h2>
-                        <p class="mt-5 leading-7 text-stone-600">
+                        <p
+                            class="mx-auto mt-4 max-w-2xl leading-7 text-stone-600"
+                        >
                             {{
                                 tr(
-                                    'HonduCasa reúne la información que compradores e inquilinos necesitan en una experiencia clara y sencilla.',
-                                    'HonduCasa brings the details buyers and renters need into one calm, straightforward experience.',
+                                    'Una plataforma diseñada para hacer que alquilar, comprar y publicar propiedades sea simple, seguro y eficiente.',
+                                    'A platform designed to make renting, buying, and listing properties simple, safe, and efficient.',
                                 )
                             }}
                         </p>
+
+                        <div
+                            class="mx-auto mt-7 grid max-w-md grid-cols-2 rounded-full border border-[var(--public-border)] bg-[var(--public-surface-raised)] p-1"
+                        >
+                            <button
+                                type="button"
+                                class="rounded-full px-5 py-3 text-sm font-semibold transition"
+                                :class="
+                                    audience === 'renters'
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-[var(--public-muted)] hover:text-[var(--public-text)]'
+                                "
+                                @click="audience = 'renters'"
+                            >
+                                {{ tr('Para inquilinos', 'For renters') }}
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded-full px-5 py-3 text-sm font-semibold transition"
+                                :class="
+                                    audience === 'owners'
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-[var(--public-muted)] hover:text-[var(--public-text)]'
+                                "
+                                @click="audience = 'owners'"
+                            >
+                                {{ tr('Para propietarios', 'For owners') }}
+                            </button>
+                        </div>
                     </div>
-                    <div class="grid gap-4 sm:grid-cols-3">
+
+                    <div class="mt-9 grid gap-5 lg:grid-cols-3">
                         <article
-                            v-for="item in [
-                                {
-                                    icon: MapPin,
-                                    title: tr(
-                                        'Busca por ubicación',
-                                        'Search by location',
-                                    ),
-                                    text: tr(
-                                        'Elige dónde quieres vivir y si deseas alquilar o comprar.',
-                                        'Choose where you want to live and whether you want to rent or buy.',
-                                    ),
-                                },
-                                {
-                                    icon: ShieldCheck,
-                                    title: tr(
-                                        'Confía en los detalles',
-                                        'Trust the details',
-                                    ),
-                                    text: tr(
-                                        'Información clara y anunciantes responsables.',
-                                        'Clear property information and accountable publishers.',
-                                    ),
-                                },
-                                {
-                                    icon: CheckCircle2,
-                                    title: tr(
-                                        'Conecta directamente',
-                                        'Connect directly',
-                                    ),
-                                    text: tr(
-                                        'Guarda favoritos y contacta a la persona indicada.',
-                                        'Save favorites and contact the right person with context.',
-                                    ),
-                                },
-                            ]"
+                            v-for="(item, index) in audience === 'renters'
+                                ? [
+                                      {
+                                          icon: Search,
+                                          title: tr(
+                                              'Encuentra tu lugar ideal',
+                                              'Find your ideal place',
+                                          ),
+                                          text: tr(
+                                              'Explora propiedades filtrando por ubicación, precio, tipo y más.',
+                                              'Explore properties by location, price, type, and more.',
+                                          ),
+                                      },
+                                      {
+                                          icon: Heart,
+                                          title: tr(
+                                              'Compara y guarda',
+                                              'Compare and save',
+                                          ),
+                                          text: tr(
+                                              'Guarda tus favoritas, compara detalles y toma decisiones con confianza.',
+                                              'Save favorites, compare details, and decide with confidence.',
+                                          ),
+                                      },
+                                      {
+                                          icon: MessageCircle,
+                                          title: tr(
+                                              'Contacta directamente',
+                                              'Contact directly',
+                                          ),
+                                          text: tr(
+                                              'Habla directo con propietarios o agentes verificados, sin intermediarios.',
+                                              'Talk directly with verified owners or agents, without intermediaries.',
+                                          ),
+                                      },
+                                  ]
+                                : [
+                                      {
+                                          icon: Building2,
+                                          title: tr(
+                                              'Publica fácilmente',
+                                              'List with ease',
+                                          ),
+                                          text: tr(
+                                              'Crea un anuncio completo con fotos, precio y ubicación.',
+                                              'Create a complete listing with photos, price, and location.',
+                                          ),
+                                      },
+                                      {
+                                          icon: CheckCircle2,
+                                          title: tr(
+                                              'Administra tus anuncios',
+                                              'Manage your listings',
+                                          ),
+                                          text: tr(
+                                              'Guarda borradores y controla cuándo aparece cada propiedad.',
+                                              'Save drafts and control when each property appears.',
+                                          ),
+                                      },
+                                      {
+                                          icon: MessageCircle,
+                                          title: tr(
+                                              'Conecta con interesados',
+                                              'Connect with prospects',
+                                          ),
+                                          text: tr(
+                                              'Recibe consultas y conversa con posibles inquilinos o compradores.',
+                                              'Receive inquiries and chat with potential renters or buyers.',
+                                          ),
+                                      },
+                                  ]"
                             :key="item.title"
-                            class="rounded-3xl border border-[var(--public-border)] bg-[var(--public-surface-raised)] p-6"
+                            class="relative rounded-3xl border border-[var(--public-border)] bg-[var(--public-surface-raised)] p-6 shadow-sm sm:p-7"
                         >
                             <span
-                                class="grid size-11 place-items-center rounded-xl bg-blue-100 text-blue-800"
-                                ><component :is="item.icon" class="size-5"
-                            /></span>
-                            <h3 class="mt-7 font-semibold">{{ item.title }}</h3>
-                            <p class="mt-2 text-sm leading-6 text-stone-600">
-                                {{ item.text }}
-                            </p>
+                                class="grid size-9 place-items-center rounded-xl bg-primary text-sm font-bold text-primary-foreground"
+                                >0{{ index + 1 }}</span
+                            >
+                            <div class="mt-5 flex items-start gap-5">
+                                <span
+                                    class="grid size-16 shrink-0 place-items-center rounded-2xl bg-blue-100 text-blue-800"
+                                    ><component :is="item.icon" class="size-8"
+                                /></span>
+                                <div>
+                                    <h3 class="font-semibold">
+                                        {{ item.title }}
+                                    </h3>
+                                    <p
+                                        class="mt-2 text-sm leading-6 text-stone-600"
+                                    >
+                                        {{ item.text }}
+                                    </p>
+                                </div>
+                            </div>
                         </article>
+                    </div>
+
+                    <div
+                        class="mt-6 flex items-start gap-4 rounded-2xl border border-[var(--public-border)] bg-[var(--public-surface-hover)] p-5"
+                    >
+                        <span
+                            class="grid size-12 shrink-0 place-items-center rounded-xl bg-blue-100 text-blue-800"
+                        >
+                            <ShieldCheck class="size-6" />
+                        </span>
+                        <div>
+                            <h3 class="font-semibold">
+                                {{
+                                    tr(
+                                        'Confianza en cada paso',
+                                        'Confidence at every step',
+                                    )
+                                }}
+                            </h3>
+                            <p class="mt-1 text-sm text-stone-600">
+                                {{
+                                    tr(
+                                        'Perfiles verificados, información clara y contacto directo para que tomes decisiones seguras.',
+                                        'Verified profiles, clear information, and direct contact so you can make confident decisions.',
+                                    )
+                                }}
+                            </p>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <section id="owners" class="mx-auto max-w-7xl px-5 py-24 sm:px-8">
+            <section
+                id="owners"
+                class="mx-auto max-w-[1360px] px-5 pt-6 pb-24 sm:px-8"
+            >
                 <div
-                    class="relative overflow-hidden rounded-[2.5rem] bg-primary px-7 py-12 text-primary-foreground sm:px-12 lg:flex lg:items-center lg:justify-between lg:px-16"
+                    class="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-blue-700 via-blue-600 to-blue-700 px-7 py-10 text-white shadow-lg sm:px-12 lg:grid lg:min-h-[360px] lg:grid-cols-[.9fr_1.1fr] lg:items-center lg:px-14"
                 >
                     <Building2
-                        class="absolute -right-5 -bottom-10 size-52 text-white/10"
+                        class="absolute -right-6 -bottom-12 size-52 text-white/10"
                         :stroke-width="1"
                     />
-                    <div class="relative max-w-2xl">
+                    <div
+                        class="absolute top-8 right-8 h-28 w-36 [background-image:radial-gradient(circle,rgba(255,255,255,.35)_1.5px,transparent_1.5px)] [background-size:16px_16px] opacity-50"
+                    />
+                    <div class="relative z-10 max-w-xl">
                         <p
                             class="text-sm font-bold tracking-[0.16em] text-blue-100 uppercase"
                         >
@@ -486,46 +637,89 @@ const exploreCity = (city: string): void => {
                             }}
                         </p>
                         <h2
-                            class="mt-3 text-3xl font-semibold tracking-tight text-primary-foreground sm:text-4xl"
+                            class="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl"
                         >
                             {{
                                 tr(
-                                    '¿Tienes una propiedad para publicar?',
-                                    'Have a property to list?',
+                                    'Publica tu propiedad y llega a más personas',
+                                    'List your property and reach more people',
                                 )
                             }}
                         </h2>
                         <p class="mt-4 max-w-xl text-blue-100">
                             {{
                                 tr(
-                                    'Publica tu propiedad con fotos, precio y ubicación. Puedes guardarla como borrador antes de hacerla visible.',
-                                    'Publish your property with photos, pricing, and location. Save it as a draft before making it visible.',
+                                    'Publica gratis, administra tus anuncios y conecta con inquilinos o compradores interesados.',
+                                    'List for free, manage your properties, and connect with interested renters or buyers.',
+                                )
+                            }}
+                        </p>
+                        <Link
+                            :href="listPropertyUrl"
+                            class="mt-7 inline-flex items-center gap-3 rounded-xl bg-white px-6 py-3.5 font-semibold text-blue-700 transition hover:bg-blue-50"
+                        >
+                            {{
+                                tr('Publicar mi propiedad', 'List my property')
+                            }}
+                            <ArrowRight class="size-4" />
+                        </Link>
+                        <p class="mt-5 flex items-center gap-2 text-sm">
+                            <CheckCircle2 class="size-4" />
+                            {{
+                                tr(
+                                    'Publicación fácil, rápida y gratuita',
+                                    'Easy, fast, and free listing',
                                 )
                             }}
                         </p>
                     </div>
-                    <Link
-                        :href="listPropertyUrl"
-                        class="relative mt-8 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 font-semibold text-primary transition hover:bg-slate-100 lg:mt-0"
+
+                    <div
+                        class="relative mt-10 hidden min-h-64 lg:mt-0 lg:block"
                     >
-                        {{ tr('Publicar propiedad', 'List a property') }}
-                        <ArrowRight class="size-4" />
-                    </Link>
+                        <img
+                            src="/images/sps-1.jpg"
+                            :alt="
+                                tr(
+                                    'Vista de San Pedro Sula',
+                                    'San Pedro Sula view',
+                                )
+                            "
+                            class="absolute top-0 right-8 h-64 w-[75%] rounded-2xl border border-white/20 object-cover shadow-2xl"
+                        />
+                        <img
+                            src="/images/tegucigalpa-1.jpg"
+                            :alt="
+                                tr('Vista de Tegucigalpa', 'Tegucigalpa view')
+                            "
+                            class="absolute -bottom-4 left-4 h-28 w-48 rounded-xl border-2 border-white object-cover shadow-xl"
+                        />
+                        <img
+                            src="/images/comayagua-1.jpg"
+                            :alt="tr('Vista de Comayagua', 'Comayagua view')"
+                            class="absolute top-10 right-0 h-36 w-52 rounded-xl border-2 border-white object-cover shadow-xl"
+                        />
+                    </div>
                 </div>
             </section>
         </main>
 
-        <footer class="bg-[#0a2748] text-white/70">
+        <footer
+            class="bg-[var(--public-surface)] text-[var(--public-text-muted)]"
+        >
             <div
                 class="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-8"
             >
-                <div class="flex items-center gap-2 font-semibold text-white">
-                    <AppLogoIcon class="size-7" /> HonduCasa
+                <div
+                    class="flex items-center gap-2 font-semibold text-[var(--public-text)]"
+                >
+                    <AppLogoIcon class="size-7" /> Honducasa
                 </div>
                 <p>
-                    Built for renters, owners, and communities across Honduras.
+                    Hecho para inquilinos, propietarios y comunidades de todo
+                    Honduras.
                 </p>
-                <p>© {{ new Date().getFullYear() }} HonduCasa</p>
+                <p>© {{ new Date().getFullYear() }} Honducasa</p>
             </div>
         </footer>
     </div>

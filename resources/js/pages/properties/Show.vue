@@ -22,6 +22,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import AuthModal from '@/components/AuthModal.vue';
 import PropertyDetailMap from '@/components/PropertyDetailMap.vue';
 import PublicHeader from '@/components/PublicHeader.vue';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Toaster } from '@/components/ui/sonner';
 import { usePendingAuthAction } from '@/composables/usePendingAuthAction';
 import type { PendingAuthAction } from '@/composables/usePendingAuthAction';
@@ -97,6 +104,11 @@ const props = defineProps<{
     status?: string;
 }>();
 const page = usePage();
+const canonicalUrl = computed(() =>
+    typeof window === 'undefined'
+        ? page.url
+        : new URL(page.url, window.location.origin).href,
+);
 const locale = computed(() => page.props.locale);
 const tr = (es: string, en: string): string =>
     locale.value === 'es' ? es : en;
@@ -203,6 +215,7 @@ onBeforeUnmount(() =>
     window.removeEventListener('keydown', handleGalleryKeydown),
 );
 const messageForm = useForm({ body: '' });
+const messageModalOpen = ref(false);
 const sendInitialMessage = async (): Promise<void> => {
     if (!page.props.auth.user) {
         await requireAuth(
@@ -218,13 +231,17 @@ const sendInitialMessage = async (): Promise<void> => {
                 },
             },
         );
+        messageModalOpen.value = false;
 
         return;
     }
 
     messageForm.post(startConversation.url(props.property.slug), {
         preserveScroll: true,
-        onSuccess: () => messageForm.reset(),
+        onSuccess: () => {
+            messageForm.reset();
+            messageModalOpen.value = false;
+        },
     });
 };
 const authModalOpen = ref(false);
@@ -284,7 +301,39 @@ const toggleFavorite = (): void => {
     >
         <meta
             name="description"
-            :content="`${property.name ?? 'HonduCasa'} · ${property.location}, Honduras`"
+            :content="`${property.name ?? 'Honducasa'} · ${property.location}, Honduras`"
+        />
+        <link rel="canonical" :href="canonicalUrl" />
+        <meta property="og:locale" content="es_HN" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Honducasa" />
+        <meta
+            property="og:title"
+            :content="property.name ?? 'Propiedad en Honduras'"
+        />
+        <meta
+            property="og:description"
+            :content="`${property.name ?? 'Propiedad'} en ${property.location}, Honduras. Consulta precio, fotos y detalles en Honducasa.`"
+        />
+        <meta property="og:url" :content="canonicalUrl" />
+        <meta
+            v-if="property.images[0]"
+            property="og:image"
+            :content="property.images[0].url"
+        />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta
+            name="twitter:title"
+            :content="property.name ?? 'Propiedad en Honduras'"
+        />
+        <meta
+            name="twitter:description"
+            :content="`${property.name ?? 'Propiedad'} en ${property.location}, Honduras. Consulta precio, fotos y detalles en Honducasa.`"
+        />
+        <meta
+            v-if="property.images[0]"
+            name="twitter:image"
+            :content="property.images[0].url"
         />
     </Head>
 
@@ -300,8 +349,8 @@ const toggleFavorite = (): void => {
             {{
                 status === 'published'
                     ? tr(
-                          'Vista previa. Así ven tu propiedad las personas que visitan HonduCasa.',
-                          'Preview. This is how visitors see your listing on HonduCasa.',
+                          'Vista previa. Así ven tu propiedad las personas que visitan Honducasa.',
+                          'Preview. This is how visitors see your listing on Honducasa.',
                       )
                     : tr(
                           'Vista previa. Esta propiedad todavía no es visible al público.',
@@ -310,7 +359,7 @@ const toggleFavorite = (): void => {
             }}
         </p>
 
-        <main class="public-container py-8">
+        <main class="public-container pt-8 pb-32 lg:py-8">
             <Link
                 :href="resultsUrl"
                 class="inline-flex items-center gap-2 text-sm font-semibold text-blue-800"
@@ -393,9 +442,47 @@ const toggleFavorite = (): void => {
                         <MapPin class="size-5 text-blue-700" />
                         {{ property.location }}, Honduras
                     </p>
+
+                    <div class="mt-5 lg:hidden">
+                        <p
+                            class="text-3xl font-semibold text-[var(--public-brand-ink)]"
+                        >
+                            <span v-if="property.priceIsConverted">≈ </span>
+                            {{ money(property.priceAmount, property.currency)
+                            }}<span
+                                v-if="property.listingType === 'rent'"
+                                class="text-sm font-normal text-stone-500"
+                                >/{{ tr('mes', 'mo') }}</span
+                            >
+                        </p>
+                        <p
+                            v-if="property.priceIsConverted"
+                            class="mt-1 text-sm text-stone-500"
+                        >
+                            {{
+                                tr('Precio original', 'Original asking price')
+                            }}:
+                            {{
+                                money(
+                                    property.originalPriceAmount,
+                                    property.originalCurrency,
+                                )
+                            }}
+                        </p>
+                        <p
+                            v-if="property.depositAmount"
+                            class="mt-1 text-sm text-stone-500"
+                        >
+                            {{ tr('Depósito', 'Deposit') }}:
+                            {{
+                                money(property.depositAmount, property.currency)
+                            }}
+                        </p>
+                    </div>
+
                     <button
                         type="button"
-                        class="mt-5 inline-flex items-center gap-2 rounded-full border border-blue-800 px-4 py-2 font-semibold text-blue-800"
+                        class="mt-5 hidden items-center gap-2 rounded-full border border-blue-800 px-4 py-2 font-semibold text-blue-800 lg:inline-flex"
                         @click="toggleFavorite"
                     >
                         <Heart
@@ -537,43 +624,55 @@ const toggleFavorite = (): void => {
                     </section>
                 </div>
 
-                <aside class="lg:sticky lg:top-6 lg:self-start">
+                <aside class="hidden lg:sticky lg:top-6 lg:block lg:self-start">
                     <div class="public-elevated-card p-6">
-                        <p
-                            class="text-3xl font-semibold text-[var(--public-brand-ink)]"
-                        >
-                            <span v-if="property.priceIsConverted">≈ </span>
-                            {{ money(property.priceAmount, property.currency)
-                            }}<span
-                                v-if="property.listingType === 'rent'"
-                                class="text-sm font-normal text-stone-500"
-                                >/{{ tr('mes', 'mo') }}</span
+                        <div class="hidden lg:block">
+                            <p
+                                class="text-3xl font-semibold text-[var(--public-brand-ink)]"
                             >
-                        </p>
-                        <p
-                            v-if="property.priceIsConverted"
-                            class="mt-1 text-sm text-stone-500"
-                        >
-                            {{
-                                tr('Precio original', 'Original asking price')
-                            }}:
-                            {{
-                                money(
-                                    property.originalPriceAmount,
-                                    property.originalCurrency,
-                                )
-                            }}
-                        </p>
-                        <p
-                            v-if="property.depositAmount"
-                            class="mt-2 text-sm text-stone-500"
-                        >
-                            {{ tr('Depósito', 'Deposit') }}:
-                            {{
-                                money(property.depositAmount, property.currency)
-                            }}
-                        </p>
-                        <div class="mt-6 border-t border-stone-100 pt-6">
+                                <span v-if="property.priceIsConverted">≈ </span>
+                                {{
+                                    money(
+                                        property.priceAmount,
+                                        property.currency,
+                                    )
+                                }}<span
+                                    v-if="property.listingType === 'rent'"
+                                    class="text-sm font-normal text-stone-500"
+                                    >/{{ tr('mes', 'mo') }}</span
+                                >
+                            </p>
+                            <p
+                                v-if="property.priceIsConverted"
+                                class="mt-1 text-sm text-stone-500"
+                            >
+                                {{
+                                    tr(
+                                        'Precio original',
+                                        'Original asking price',
+                                    )
+                                }}:
+                                {{
+                                    money(
+                                        property.originalPriceAmount,
+                                        property.originalCurrency,
+                                    )
+                                }}
+                            </p>
+                            <p
+                                v-if="property.depositAmount"
+                                class="mt-2 text-sm text-stone-500"
+                            >
+                                {{ tr('Depósito', 'Deposit') }}:
+                                {{
+                                    money(
+                                        property.depositAmount,
+                                        property.currency,
+                                    )
+                                }}
+                            </p>
+                        </div>
+                        <div class="border-stone-100 pt-6 lg:mt-6 lg:border-t">
                             <p
                                 class="text-xs font-bold tracking-wider text-stone-500 uppercase"
                             >
@@ -595,8 +694,8 @@ const toggleFavorite = (): void => {
                                 {{
                                     property.publisher.isAgency
                                         ? tr(
-                                              'Agencia en HonduCasa',
-                                              'HonduCasa agency',
+                                              'Agencia en Honducasa',
+                                              'Honducasa agency',
                                           )
                                         : tr(
                                               'Anunciante individual',
@@ -735,6 +834,113 @@ const toggleFavorite = (): void => {
                 </div>
             </section>
         </main>
+
+        <nav
+            class="fixed inset-x-0 bottom-0 z-[900] border-t border-[var(--public-border)] bg-[var(--public-surface-raised)]/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgb(0_0_0/0.16)] backdrop-blur lg:hidden"
+            :aria-label="tr('Acciones de la propiedad', 'Property actions')"
+        >
+            <div class="mx-auto flex max-w-lg gap-3">
+                <button
+                    type="button"
+                    class="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--public-brand-ink)] px-4 font-semibold text-[var(--public-brand-ink)]"
+                    @click="toggleFavorite"
+                >
+                    <Heart
+                        class="size-5"
+                        :class="property.isFavorited ? 'fill-current' : ''"
+                    />
+                    {{
+                        property.isFavorited
+                            ? tr('Guardada', 'Saved')
+                            : tr('Guardar', 'Save')
+                    }}
+                </button>
+
+                <Link
+                    v-if="property.messaging.existingConversationId"
+                    :href="
+                        messages(property.messaging.existingConversationId).url
+                    "
+                    class="flex min-h-12 flex-[1.35] items-center justify-center gap-2 rounded-xl bg-primary px-4 font-semibold text-primary-foreground hover:bg-primary-hover"
+                >
+                    <MessageCircle class="size-5" />
+                    {{ tr('Ver chat', 'View chat') }}
+                </Link>
+                <button
+                    v-else-if="
+                        property.messaging.canMessage || !page.props.auth.user
+                    "
+                    type="button"
+                    :disabled="messageForm.processing"
+                    class="flex min-h-12 flex-[1.35] items-center justify-center gap-2 rounded-xl bg-primary px-4 font-semibold text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
+                    @click="messageModalOpen = true"
+                >
+                    <MessageCircle class="size-5" />
+                    {{ tr('Enviar mensaje', 'Send message') }}
+                </button>
+            </div>
+        </nav>
+
+        <Dialog v-model:open="messageModalOpen">
+            <DialogContent class="sm:max-w-md lg:hidden">
+                <DialogHeader>
+                    <DialogTitle>
+                        {{ tr('Enviar mensaje', 'Send message') }}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {{
+                            tr(
+                                `Pregunta a ${property.publisher.name} sobre esta propiedad.`,
+                                `Ask ${property.publisher.name} about this property.`,
+                            )
+                        }}
+                    </DialogDescription>
+                </DialogHeader>
+
+                <form @submit.prevent="sendInitialMessage">
+                    <label for="mobile-message" class="text-sm font-semibold">
+                        {{
+                            tr('Mensaje al anunciante', 'Message the publisher')
+                        }}
+                    </label>
+                    <textarea
+                        id="mobile-message"
+                        v-model="messageForm.body"
+                        autofocus
+                        rows="6"
+                        class="mt-2 min-h-40 w-full resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        :placeholder="
+                            tr(
+                                'Menciona qué te interesa y cualquier pregunta sobre la propiedad…',
+                                'Mention what interests you and any questions about the property…',
+                            )
+                        "
+                    />
+                    <p
+                        v-if="messageForm.errors.body"
+                        class="mt-2 text-sm text-red-600"
+                    >
+                        {{ messageForm.errors.body }}
+                    </p>
+                    <p class="mt-2 text-xs text-muted-foreground">
+                        {{
+                            tr(
+                                'Por seguridad, no compartas teléfonos, correos ni enlaces.',
+                                'For safety, do not share phone numbers, email addresses, or links.',
+                            )
+                        }}
+                    </p>
+                    <button
+                        type="submit"
+                        :disabled="messageForm.processing"
+                        class="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3.5 font-semibold text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
+                    >
+                        <MessageCircle class="size-5" />
+                        {{ tr('Enviar mensaje', 'Send message') }}
+                    </button>
+                </form>
+            </DialogContent>
+        </Dialog>
 
         <Teleport to="body">
             <div

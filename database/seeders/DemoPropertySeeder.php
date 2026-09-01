@@ -66,7 +66,7 @@ class DemoPropertySeeder extends Seeder
 
         $owner = User::query()->where('email', 'demo@honducasa.test')->first()
             ?? User::factory()->withPersonalTeam()->create([
-                'name' => 'HonduCasa Demo',
+                'name' => 'Honducasa Demo',
                 'email' => 'demo@honducasa.test',
             ]);
 

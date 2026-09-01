@@ -25,7 +25,7 @@ class NotifyConversationParticipants
         foreach ($recipients as $recipient) {
             $recipient->notify((new ConversationMessageReceived(
                 conversationId: $conversation->id,
-                propertyName: $conversation->property->name ?? 'HonduCasa',
+                propertyName: $conversation->property->name ?? 'Honducasa',
                 senderLabel: $senderLabel,
                 preview: Str::limit($message->body, 120),
             ))->afterCommit());

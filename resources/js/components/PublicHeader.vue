@@ -76,7 +76,7 @@ const hoverClasses = computed(() =>
             <Link
                 :href="home.url()"
                 class="flex shrink-0 items-center gap-2.5"
-                aria-label="HonduCasa home"
+                aria-label="Honducasa home"
             >
                 <AppLogoIcon class="size-10" />
                 <span class="text-xl font-semibold tracking-[-0.02em]"

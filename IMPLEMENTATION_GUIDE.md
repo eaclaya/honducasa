@@ -1,4 +1,4 @@
-# HonduCasa Rental Marketplace Implementation Guide
+# Honducasa Rental Marketplace Implementation Guide
 
 ## 1. Purpose
 
@@ -282,7 +282,7 @@ Required constraints:
 
 OAuth-only users require the local `users.password` column to become nullable. Manual registration still requires and hashes a password; Google-created users receive `null`, never a generated password that nobody can recover. Update the model typing, password-management UI, and authentication-method checks accordingly.
 
-Do not use the Google email address as the provider identity because it can change. Do not store Google access or refresh tokens when HonduCasa requests only authentication scopes and does not call Google APIs.
+Do not use the Google email address as the provider identity because it can change. Do not store Google access or refresh tokens when Honducasa requests only authentication scopes and does not call Google APIs.
 
 ### Enums and state transitions
 
@@ -598,7 +598,7 @@ flowchart LR
     L -. future .-> S["Search service in Docker"]
 ```
 
-Only add Redis, an object-storage emulator, mail capture, or a search service when an implementation slice needs it. A container is not automatically a microservice: supporting infrastructure has no HonduCasa domain ownership, while the Laravel application retains the domain workflows and transactional boundary.
+Only add Redis, an object-storage emulator, mail capture, or a search service when an implementation slice needs it. A container is not automatically a microservice: supporting infrastructure has no Honducasa domain ownership, while the Laravel application retains the domain workflows and transactional boundary.
 
 ### PostgreSQL and PostGIS baseline
 
