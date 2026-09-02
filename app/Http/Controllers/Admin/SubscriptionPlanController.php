@@ -28,6 +28,7 @@ class SubscriptionPlanController extends Controller
                 'ladder' => $plan->ladder->value,
                 'name' => $plan->name,
                 'activeListingsLimit' => $plan->active_listings_limit,
+                'pricingModel' => $plan->pricing_model->value,
                 'seatsLimit' => $plan->seats_limit,
                 'featuredListingSlots' => $plan->featured_listing_slots,
                 'analyticsTier' => $plan->analytics_tier->value,

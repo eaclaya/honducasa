@@ -14,6 +14,7 @@ use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\ConversationReportController;
 use App\Http\Controllers\ConversationStatusController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DisplayCurrencyController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ListingController;
 use App\Http\Controllers\ListingPhotoEnhancementController;
@@ -30,6 +31,7 @@ use App\Http\Controllers\RentalSearchController;
 use App\Http\Controllers\SavedSearchController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Controllers\UserDashboardController;
+use App\Http\Middleware\EnsureSubscriptionActive;
 use App\Http\Middleware\EnsureTeamCanCreateListing;
 use App\Http\Middleware\EnsureTeamMembership;
 use App\Http\Middleware\EnsureUserIsAdmin;
@@ -48,6 +50,7 @@ Route::get('/properties/{property:slug}/preview', [PropertyShowController::class
     ->middleware(['auth', 'verified'])
     ->name('properties.preview');
 Route::post('/locale/{locale}', LocaleController::class)->whereIn('locale', ['es', 'en'])->name('locale.update');
+Route::post('/currency/{currency}', DisplayCurrencyController::class)->name('currency.update');
 
 Route::middleware(['guest', 'throttle:20,1'])->group(function () {
     Route::post('auth/pending-action', PendingAuthActionController::class)->name('auth.pending-action.store');
@@ -57,10 +60,10 @@ Route::middleware(['guest', 'throttle:20,1'])->group(function () {
 });
 
 Route::get('dashboard', UserDashboardController::class)
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth', 'verified', EnsureSubscriptionActive::class])
     ->name('user.dashboard');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', EnsureSubscriptionActive::class])->group(function () {
     Route::get('listings/start', [ListingController::class, 'create'])->middleware(EnsureTeamCanCreateListing::class)->name('listings.start');
     Route::post('listings/start', [ListingController::class, 'store'])->name('listings.start.store');
     Route::get('listings', [ListingController::class, 'index'])->name('personal-listings.index');
@@ -68,6 +71,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('listings', [ListingController::class, 'store'])->name('personal-listings.store');
     Route::get('listings/{listing}/edit', [ListingController::class, 'editPersonal'])->name('personal-listings.edit');
     Route::match(['put', 'patch'], 'listings/{listing}', [ListingController::class, 'updatePersonal'])->name('personal-listings.update');
+    Route::patch('listings/{listing}/status', [ListingController::class, 'updatePersonalStatus'])->name('personal-listings.status.update');
     Route::delete('listings/{listing}', [ListingController::class, 'destroyPersonal'])->name('personal-listings.destroy');
     Route::post('listings/uploads', [ListingUploadController::class, 'store'])->name('listings.uploads.store');
     Route::post('listings/uploads/{media}/enhance', ListingPhotoEnhancementController::class)
@@ -80,12 +84,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 Route::prefix('{current_team}')
-    ->middleware(['auth', 'verified', EnsureTeamMembership::class])
+    ->middleware(['auth', 'verified', EnsureTeamMembership::class, EnsureSubscriptionActive::class])
     ->group(function () {
         Route::get('dashboard', DashboardController::class)->name('dashboard');
         Route::get('listings/create', [ListingController::class, 'create'])
             ->middleware(EnsureTeamCanCreateListing::class)
             ->name('listings.create');
+        Route::patch('listings/{listing}/status', [ListingController::class, 'updateStatus'])->name('listings.status.update');
         Route::resource('listings', ListingController::class)->except(['show', 'create']);
     });
 

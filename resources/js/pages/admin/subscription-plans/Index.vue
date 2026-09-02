@@ -15,6 +15,7 @@ type Plan = {
     ladder: 'individual' | 'agency';
     name: string;
     activeListingsLimit: number | null;
+    pricingModel: string;
     seatsLimit: number | null;
     featuredListingSlots: number;
     analyticsTier: string;
@@ -174,6 +175,15 @@ const editTarget = ref<Plan | null>(null);
                                     class="px-5 py-3.5 text-right font-semibold whitespace-nowrap"
                                 >
                                     {{ money(plan.priceAmount, plan.currency) }}
+                                    <span
+                                        v-if="
+                                            plan.pricingModel === 'per_listing'
+                                        "
+                                        class="font-normal text-muted-foreground"
+                                        >{{
+                                            tr('/ anuncio', '/ listing')
+                                        }}</span
+                                    >
                                 </td>
                                 <td class="px-5 py-3.5 text-center font-medium">
                                     {{ plan.subscribersCount }}

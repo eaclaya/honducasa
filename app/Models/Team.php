@@ -215,6 +215,26 @@ class Team extends Model
     }
 
     /**
+     * Whether this team currently has access to the app at all — as opposed
+     * to `canPublishAnotherListing()`, which governs only new-listing room
+     * under an already-active plan. A team past its trial with no
+     * subscription has no access; a grandfathered team always does.
+     *
+     * Deliberately checks `isOnTrial()`/`activeSubscription()` rather than
+     * `currentPlan() !== null`: the latter also depends on an entry-tier
+     * catalog row existing for the ladder, and a missing catalog row is a
+     * cause for concern, not a reason to lock a trialing team out.
+     */
+    public function hasActiveAccess(): bool
+    {
+        if ($this->trial_ends_at === null && $this->activeSubscription() === null) {
+            return true;
+        }
+
+        return $this->isOnTrial() || $this->activeSubscription() !== null;
+    }
+
+    /**
      * Get the route key for the model.
      */
     public function getRouteKeyName(): string

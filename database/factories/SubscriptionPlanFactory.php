@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\AnalyticsTier;
+use App\Enums\PricingModel;
 use App\Enums\SubscriptionLadder;
 use App\Enums\SubscriptionProvider;
 use App\Enums\SupportTier;
@@ -29,6 +30,7 @@ class SubscriptionPlanFactory extends Factory
             'ladder' => fake()->randomElement(SubscriptionLadder::cases()),
             'name' => $name,
             'active_listings_limit' => fake()->numberBetween(1, 25),
+            'pricing_model' => PricingModel::Tiered,
             'seats_limit' => fake()->numberBetween(1, 5),
             'featured_listing_slots' => 0,
             'analytics_tier' => AnalyticsTier::Basic,
@@ -60,6 +62,17 @@ class SubscriptionPlanFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'active_listings_limit' => null,
             'seats_limit' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the plan is priced per active listing, with no cap.
+     */
+    public function perListing(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'pricing_model' => PricingModel::PerListing,
+            'active_listings_limit' => null,
         ]);
     }
 }

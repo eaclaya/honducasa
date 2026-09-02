@@ -34,6 +34,7 @@ class UserBillingController extends Controller
                     'key' => $plan->key,
                     'name' => $plan->name,
                     'activeListingsLimit' => $plan->active_listings_limit,
+                    'pricingModel' => $plan->pricing_model->value,
                     'priceAmount' => $plan->price_amount,
                     'currency' => $plan->currency,
                 ]),

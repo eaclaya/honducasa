@@ -6,6 +6,7 @@ use App\Enums\SubscriptionLadder;
 use App\Models\Property;
 use App\Models\SubscriptionPlan;
 use App\Models\Team;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -99,6 +100,56 @@ test('re-publishing an already-published listing does not need additional room',
     $status = app(SetListingStatus::class)->handle($property->fresh(), ListingStatus::Published);
 
     expect($status)->toBe(ListingStatus::Published);
+});
+
+test('hasActiveAccess is true for a team that predates the subscription system', function () {
+    $team = Team::factory()->create(['trial_ends_at' => null]);
+
+    expect($team->hasActiveAccess())->toBeTrue();
+});
+
+test('hasActiveAccess is true for a team on trial', function () {
+    SubscriptionPlan::factory()->entryTier()->create(['ladder' => SubscriptionLadder::Agency]);
+    $team = Team::factory()->create(['trial_ends_at' => now()->addDays(30)]);
+
+    expect($team->hasActiveAccess())->toBeTrue();
+});
+
+test('hasActiveAccess is false for a team whose trial expired without subscribing', function () {
+    SubscriptionPlan::factory()->entryTier()->create(['ladder' => SubscriptionLadder::Agency]);
+    $team = Team::factory()->create(['trial_ends_at' => now()->subDay()]);
+
+    expect($team->hasActiveAccess())->toBeFalse();
+});
+
+test('hasActiveAccess is true for a subscribed team', function () {
+    $plan = SubscriptionPlan::factory()->create();
+    $team = Team::factory()->create(['trial_ends_at' => now()->subDay()]);
+    $team->subscriptions()->create(['subscription_plan_id' => $plan->id, 'status' => 'active']);
+
+    expect($team->hasActiveAccess())->toBeTrue();
+});
+
+test('hasActiveAccess is false for a user whose individual trial expired without subscribing', function () {
+    SubscriptionPlan::factory()->entryTier()->create(['ladder' => SubscriptionLadder::Individual]);
+    $user = User::factory()->create(['individual_trial_ends_at' => now()->subDay()]);
+
+    expect($user->hasActiveAccess())->toBeFalse();
+});
+
+test('hasActiveAccess is true for a user on individual trial', function () {
+    SubscriptionPlan::factory()->entryTier()->create(['ladder' => SubscriptionLadder::Individual]);
+    $user = User::factory()->create(['individual_trial_ends_at' => now()->addDays(30)]);
+
+    expect($user->hasActiveAccess())->toBeTrue();
+});
+
+test('hasActiveAccess is true for a subscribed individual user', function () {
+    $plan = SubscriptionPlan::factory()->create(['ladder' => SubscriptionLadder::Individual]);
+    $user = User::factory()->create(['individual_trial_ends_at' => now()->subDay()]);
+    $user->subscriptions()->create(['subscription_plan_id' => $plan->id, 'status' => 'active']);
+
+    expect($user->hasActiveAccess())->toBeTrue();
 });
 
 test('allowedFor downgrades a publish request when outside the plan limit', function () {

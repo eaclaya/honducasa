@@ -22,6 +22,7 @@ type Plan = {
     priceAmount: number;
     currency: string;
     activeListingsLimit: number | null;
+    pricingModel: string;
     seatsLimit: number | null;
     featuredListingSlots: number;
     analyticsTier: string;
@@ -80,8 +81,13 @@ const handleOpenChange = (nextOpen: boolean): void => {
                     }}</DialogTitle>
                     <DialogDescription>
                         <strong>"{{ props.plan.name }}"</strong>
-                        · {{ props.plan.key }} · {{ money }} ·
-                        {{ props.plan.provider }}.
+                        · {{ props.plan.key }} · {{ money }}
+                        {{
+                            props.plan.pricingModel === 'per_listing'
+                                ? tr('/ anuncio', '/ listing')
+                                : ''
+                        }}
+                        · {{ props.plan.provider }}.
                         {{
                             tr(
                                 'La clave, la escala, el precio y el proveedor no se pueden editar aquí.',
@@ -114,7 +120,17 @@ const handleOpenChange = (nextOpen: boolean): void => {
                             name="active_listings_limit"
                             type="number"
                             min="0"
-                            :placeholder="tr('Sin límite', 'Unlimited')"
+                            :disabled="
+                                props.plan.pricingModel === 'per_listing'
+                            "
+                            :placeholder="
+                                props.plan.pricingModel === 'per_listing'
+                                    ? tr(
+                                          'Sin límite (por anuncio)',
+                                          'Unlimited (per listing)',
+                                      )
+                                    : tr('Sin límite', 'Unlimited')
+                            "
                             :default-value="
                                 props.plan.activeListingsLimit ?? undefined
                             "

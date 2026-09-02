@@ -116,6 +116,21 @@ class User extends Authenticatable implements HasLocalePreference, HasMedia, Mus
     }
 
     /**
+     * Whether this user currently has individual access to the app at all —
+     * as opposed to `canPublishAnotherIndividualListing()`, which governs
+     * only new-listing room under an already-active plan.
+     *
+     * Deliberately checks `isOnIndividualTrial()`/`activeSubscription()`
+     * rather than `currentIndividualPlan() !== null`: the latter also
+     * depends on an entry-tier catalog row existing, and a missing catalog
+     * row is a cause for concern, not a reason to lock a trialing user out.
+     */
+    public function hasActiveAccess(): bool
+    {
+        return $this->isOnIndividualTrial() || $this->activeSubscription() !== null;
+    }
+
+    /**
      * Photos uploaded via the listing wizard before the listing is saved.
      * Moved onto the property's `photos` collection once the listing is created/updated.
      */
