@@ -3,17 +3,19 @@
 namespace App\Http\Requests\Admin;
 
 use App\Enums\AnalyticsTier;
+use App\Enums\PricingModel;
 use App\Enums\SupportTier;
+use App\Models\SubscriptionPlan;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Metadata-only: `key`, `ladder`, `price_amount`, `currency`, `provider` and
- * `provider_price_id` are reference-only per the model's docblock and can't
- * be changed here — a price or provider change means a new plan row, not an
- * edit to this one. `is_active` also isn't accepted; that's a state
- * transition handled by `SubscriptionPlanController::updateActive()`.
+ * Metadata-only: `key`, `ladder`, `price_amount`, `currency`, `provider`,
+ * `provider_price_id` and `pricing_model` are reference-only per the model's
+ * docblock and can't be changed here — a price or pricing-model change means
+ * a new plan row, not an edit to this one. `is_active` also isn't accepted;
+ * that's a state transition handled by `SubscriptionPlanController::updateActive()`.
  */
 class UpdateSubscriptionPlanRequest extends FormRequest
 {
@@ -33,7 +35,13 @@ class UpdateSubscriptionPlanRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'active_listings_limit' => ['nullable', 'integer', 'min:0'],
+            'active_listings_limit' => [
+                'nullable',
+                'integer',
+                'min:0',
+                Rule::prohibitedIf(fn () => $this->route('subscriptionPlan') instanceof SubscriptionPlan
+                    && $this->route('subscriptionPlan')->pricing_model === PricingModel::PerListing),
+            ],
             'seats_limit' => ['nullable', 'integer', 'min:0'],
             'featured_listing_slots' => ['required', 'integer', 'min:0'],
             'analytics_tier' => ['required', Rule::enum(AnalyticsTier::class)],

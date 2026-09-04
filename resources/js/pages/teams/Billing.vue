@@ -17,6 +17,7 @@ type Plan = {
     key: string;
     name: string;
     activeListingsLimit: number | null;
+    pricingModel: string;
     seatsLimit: number | null;
     featuredListingSlots: number;
     analyticsTier: string;
@@ -142,7 +143,11 @@ const statusLabel = computed(() => {
                         {{ money(plan.priceAmount, plan.currency) }}
                         <span
                             class="text-sm font-normal text-muted-foreground"
-                            >{{ tr('/ mes', '/ mo') }}</span
+                            >{{
+                                plan.pricingModel === 'per_listing'
+                                    ? tr('/ anuncio / mes', '/ listing / mo')
+                                    : tr('/ mes', '/ mo')
+                            }}</span
                         >
                     </p>
                 </div>

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AnalyticsTier;
+use App\Enums\PricingModel;
 use App\Enums\SubscriptionLadder;
 use App\Enums\SubscriptionProvider;
 use App\Models\AdminActivity;
@@ -53,6 +54,7 @@ test('an admin can create a new plan, which is recorded on the audit trail', fun
             'key' => 'individual-pro',
             'ladder' => 'individual',
             'name' => 'Individual — Pro',
+            'pricing_model' => 'tiered',
             'active_listings_limit' => 20,
             'seats_limit' => 1,
             'featured_listing_slots' => 2,
@@ -161,4 +163,63 @@ test('editing a plan cannot change its price, provider, key or ladder', function
         ->and($plan->ladder)->toBe(SubscriptionLadder::Individual)
         ->and($plan->price_amount)->toBe(350)
         ->and($plan->provider)->toBe(SubscriptionProvider::Manual);
+});
+
+test('a per-listing plan cannot be created with an active listings limit', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.subscription-plans.store'), [
+            'key' => 'agency-per-listing',
+            'ladder' => 'agency',
+            'name' => 'Agency — Per listing',
+            'pricing_model' => PricingModel::PerListing->value,
+            'active_listings_limit' => 5,
+            'featured_listing_slots' => 0,
+            'analytics_tier' => 'basic',
+            'support_tier' => 'standard',
+            'price_amount' => 500,
+            'currency' => 'HNL',
+            'provider' => 'manual',
+        ])
+        ->assertSessionHasErrors('active_listings_limit');
+});
+
+test('a per-listing plan created without a limit is stored correctly', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    $this->actingAs($admin)
+        ->post(route('admin.subscription-plans.store'), [
+            'key' => 'agency-per-listing',
+            'ladder' => 'agency',
+            'name' => 'Agency — Per listing',
+            'pricing_model' => PricingModel::PerListing->value,
+            'featured_listing_slots' => 0,
+            'analytics_tier' => 'basic',
+            'support_tier' => 'standard',
+            'price_amount' => 500,
+            'currency' => 'HNL',
+            'provider' => 'manual',
+        ])
+        ->assertRedirect();
+
+    $plan = SubscriptionPlan::query()->where('key', 'agency-per-listing')->firstOrFail();
+    expect($plan->pricing_model)->toBe(PricingModel::PerListing)
+        ->and($plan->active_listings_limit)->toBeNull();
+});
+
+test('a per-listing plan cannot be updated to have an active listings limit', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $plan = SubscriptionPlan::factory()->perListing()->create();
+
+    $this->actingAs($admin)
+        ->patch(route('admin.subscription-plans.update', $plan), [
+            'name' => $plan->name,
+            'active_listings_limit' => 5,
+            'featured_listing_slots' => $plan->featured_listing_slots,
+            'analytics_tier' => $plan->analytics_tier->value,
+            'support_tier' => $plan->support_tier->value,
+            'sort_order' => $plan->sort_order,
+        ])
+        ->assertSessionHasErrors('active_listings_limit');
 });

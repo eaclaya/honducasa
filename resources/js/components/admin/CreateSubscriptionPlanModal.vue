@@ -30,12 +30,14 @@ const tr = (es: string, en: string): string =>
     page.props.locale === 'es' ? es : en;
 
 const formKey = ref(0);
+const pricingModel = ref('tiered');
 
 const handleOpenChange = (nextOpen: boolean): void => {
     emit('update:open', nextOpen);
 
     if (!nextOpen) {
         formKey.value++;
+        pricingModel.value = 'tiered';
     }
 };
 </script>
@@ -115,6 +117,26 @@ const handleOpenChange = (nextOpen: boolean): void => {
                     </div>
 
                     <div class="grid gap-2">
+                        <Label for="pricing_model">{{
+                            tr('Modelo de precio', 'Pricing model')
+                        }}</Label>
+                        <select
+                            id="pricing_model"
+                            name="pricing_model"
+                            v-model="pricingModel"
+                            class="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
+                        >
+                            <option value="tiered">
+                                {{ tr('Fijo por rango', 'Flat, tiered') }}
+                            </option>
+                            <option value="per_listing">
+                                {{ tr('Por anuncio', 'Per listing') }}
+                            </option>
+                        </select>
+                        <InputError :message="errors.pricing_model" />
+                    </div>
+
+                    <div class="grid gap-2">
                         <Label for="active_listings_limit">{{
                             tr('Límite de anuncios', 'Listings limit')
                         }}</Label>
@@ -123,7 +145,15 @@ const handleOpenChange = (nextOpen: boolean): void => {
                             name="active_listings_limit"
                             type="number"
                             min="0"
-                            :placeholder="tr('Sin límite', 'Unlimited')"
+                            :disabled="pricingModel === 'per_listing'"
+                            :placeholder="
+                                pricingModel === 'per_listing'
+                                    ? tr(
+                                          'Sin límite (por anuncio)',
+                                          'Unlimited (per listing)',
+                                      )
+                                    : tr('Sin límite', 'Unlimited')
+                            "
                         />
                         <InputError :message="errors.active_listings_limit" />
                     </div>

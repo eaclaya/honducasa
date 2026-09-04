@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AnalyticsTier;
+use App\Enums\PricingModel;
 use App\Enums\SubscriptionLadder;
 use App\Enums\SubscriptionProvider;
 use App\Enums\SupportTier;
@@ -19,14 +20,22 @@ use Illuminate\Support\Carbon;
 /**
  * A sellable tier. One row maps to one Product+Price on whichever payment
  * provider is in use — `provider_price_id` is a reference to that external
- * object, never computed locally. Price and provider fields are reference
- * only: a price change means a new plan row, not an edit to this one.
+ * object, never computed locally. Price, provider, and pricing_model fields
+ * are reference only: a price or pricing-model change means a new plan row,
+ * not an edit to this one.
+ *
+ * `pricing_model` of `PerListing` means `price_amount` is charged per active
+ * listing rather than flat for a capped range — such plans always have a
+ * null `active_listings_limit` (enforced by StoreSubscriptionPlanRequest /
+ * UpdateSubscriptionPlanRequest), so the existing unlimited-listings logic
+ * in Team::canPublishAnotherListing() already does the right thing for them.
  *
  * @property int $id
  * @property string $key
  * @property SubscriptionLadder $ladder
  * @property string $name
  * @property int|null $active_listings_limit
+ * @property PricingModel $pricing_model
  * @property int|null $seats_limit
  * @property int $featured_listing_slots
  * @property AnalyticsTier $analytics_tier
@@ -47,6 +56,7 @@ use Illuminate\Support\Carbon;
     'ladder',
     'name',
     'active_listings_limit',
+    'pricing_model',
     'seats_limit',
     'featured_listing_slots',
     'analytics_tier',
@@ -100,6 +110,7 @@ class SubscriptionPlan extends Model
         return [
             'ladder' => SubscriptionLadder::class,
             'active_listings_limit' => 'integer',
+            'pricing_model' => PricingModel::class,
             'seats_limit' => 'integer',
             'featured_listing_slots' => 'integer',
             'analytics_tier' => AnalyticsTier::class,

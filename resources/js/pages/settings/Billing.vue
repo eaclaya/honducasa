@@ -10,6 +10,7 @@ type Plan = {
     key: string;
     name: string;
     activeListingsLimit: number | null;
+    pricingModel: string;
     priceAmount: number;
     currency: string;
 };
@@ -80,7 +81,11 @@ defineOptions({
                     <p class="mt-1 text-2xl font-bold">
                         {{ money(plan.priceAmount, plan.currency) }}
                         <span class="text-sm font-normal text-muted-foreground">
-                            {{ tr('/ mes', '/ mo') }}
+                            {{
+                                plan.pricingModel === 'per_listing'
+                                    ? tr('/ anuncio / mes', '/ listing / mo')
+                                    : tr('/ mes', '/ mo')
+                            }}
                         </span>
                     </p>
                 </div>

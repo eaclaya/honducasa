@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Enums\AnalyticsTier;
+use App\Enums\PricingModel;
 use App\Enums\SubscriptionLadder;
 use App\Enums\SubscriptionProvider;
 use App\Enums\SupportTier;
@@ -30,7 +31,13 @@ class StoreSubscriptionPlanRequest extends FormRequest
             'key' => ['required', 'string', 'max:100', 'alpha_dash:ascii', 'unique:subscription_plans,key'],
             'ladder' => ['required', Rule::enum(SubscriptionLadder::class)],
             'name' => ['required', 'string', 'max:255'],
-            'active_listings_limit' => ['nullable', 'integer', 'min:0'],
+            'pricing_model' => ['required', Rule::enum(PricingModel::class)],
+            'active_listings_limit' => [
+                'nullable',
+                'integer',
+                'min:0',
+                Rule::prohibitedIf(fn () => $this->input('pricing_model') === PricingModel::PerListing->value),
+            ],
             'seats_limit' => ['nullable', 'integer', 'min:0'],
             'featured_listing_slots' => ['required', 'integer', 'min:0'],
             'analytics_tier' => ['required', Rule::enum(AnalyticsTier::class)],
