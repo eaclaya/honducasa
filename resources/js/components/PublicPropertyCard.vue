@@ -11,15 +11,15 @@ export type PublicPropertyCardData = {
     type: string;
     listingType: 'rent' | 'buy';
     location: string;
-    bedrooms: number;
-    bathrooms: string;
-    parkingSpaces: number;
+    bedrooms: number | null;
+    bathrooms: string | null;
+    parkingSpaces: number | null;
     interiorAreaM2: number | null;
-    furnishing: string;
+    furnishing: string | null;
     priceAmount: number;
     currency: string;
     priceIsConverted: boolean;
-    utilitiesIncluded: boolean;
+    utilitiesIncluded: boolean | null;
     primaryImage: { url: string; altText: string | null } | null;
     isFavorited: boolean;
 };
@@ -108,10 +108,25 @@ const price = computed(() =>
             <p class="mt-0.5 truncate text-sm text-[var(--public-muted)]">
                 {{ property.location }}, Honduras
             </p>
-            <p class="mt-0.5 truncate text-sm text-[var(--public-muted)]">
-                {{ property.bedrooms }} {{ tr('habitaciones', 'beds') }} ·
-                {{ property.bathrooms }} {{ tr('baños', 'baths') }} ·
-                {{ property.parkingSpaces }} {{ tr('parqueos', 'parking') }}
+            <p
+                v-if="
+                    property.bedrooms !== null ||
+                    property.bathrooms !== null ||
+                    property.parkingSpaces !== null
+                "
+                class="mt-0.5 flex flex-wrap gap-x-2 text-sm text-[var(--public-muted)]"
+            >
+                <span v-if="property.bedrooms !== null"
+                    >{{ property.bedrooms }}
+                    {{ tr('habitaciones', 'beds') }}</span
+                >
+                <span v-if="property.bathrooms !== null"
+                    >{{ property.bathrooms }} {{ tr('baños', 'baths') }}</span
+                >
+                <span v-if="property.parkingSpaces !== null"
+                    >{{ property.parkingSpaces }}
+                    {{ tr('parqueos', 'parking') }}</span
+                >
             </p>
             <p class="mt-1.5 text-sm">
                 <span class="font-semibold text-[var(--public-brand-ink)]"

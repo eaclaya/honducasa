@@ -45,13 +45,13 @@ type PropertyDetails = {
     type: string;
     listingType: 'rent' | 'buy';
     location: string;
-    bedrooms: number;
-    bathrooms: string;
-    parkingSpaces: number;
+    bedrooms: number | null;
+    bathrooms: string | null;
+    parkingSpaces: number | null;
     interiorAreaM2: number | null;
     lotAreaM2: number | null;
     yearBuilt: number | null;
-    furnishing: string;
+    furnishing: string | null;
     description: string | null;
     priceAmount: number;
     currency: string;
@@ -59,7 +59,7 @@ type PropertyDetails = {
     originalCurrency: string;
     priceIsConverted: boolean;
     depositAmount: number | null;
-    utilitiesIncluded: boolean;
+    utilitiesIncluded: boolean | null;
     isFavorited: boolean;
     publisher: {
         name: string;
@@ -92,8 +92,8 @@ type RelatedProperty = {
     currency: string;
     listingType: 'rent' | 'buy';
     image: string | null;
-    bedrooms: number;
-    bathrooms: string;
+    bedrooms: number | null;
+    bathrooms: string | null;
     interiorAreaM2: number | null;
 };
 
@@ -498,7 +498,10 @@ const toggleFavorite = (): void => {
                     <div
                         class="mt-8 grid grid-cols-2 gap-3 border-y border-stone-200 py-6 sm:grid-cols-4"
                     >
-                        <div class="flex items-center gap-3">
+                        <div
+                            v-if="property.bedrooms !== null"
+                            class="flex items-center gap-3"
+                        >
                             <BedDouble class="size-5 text-blue-700" /><span
                                 ><b>{{ property.bedrooms }}</b
                                 ><small class="block text-stone-500">{{
@@ -506,7 +509,10 @@ const toggleFavorite = (): void => {
                                 }}</small></span
                             >
                         </div>
-                        <div class="flex items-center gap-3">
+                        <div
+                            v-if="property.bathrooms !== null"
+                            class="flex items-center gap-3"
+                        >
                             <Bath class="size-5 text-blue-700" /><span
                                 ><b>{{ property.bathrooms }}</b
                                 ><small class="block text-stone-500">{{
@@ -514,7 +520,10 @@ const toggleFavorite = (): void => {
                                 }}</small></span
                             >
                         </div>
-                        <div class="flex items-center gap-3">
+                        <div
+                            v-if="property.parkingSpaces !== null"
+                            class="flex items-center gap-3"
+                        >
                             <Car class="size-5 text-blue-700" /><span
                                 ><b>{{ property.parkingSpaces }}</b
                                 ><small class="block text-stone-500">{{
@@ -522,9 +531,12 @@ const toggleFavorite = (): void => {
                                 }}</small></span
                             >
                         </div>
-                        <div class="flex items-center gap-3">
+                        <div
+                            v-if="property.interiorAreaM2 !== null"
+                            class="flex items-center gap-3"
+                        >
                             <Maximize2 class="size-5 text-blue-700" /><span
-                                ><b>{{ property.interiorAreaM2 ?? '—' }} m²</b
+                                ><b>{{ property.interiorAreaM2 }} m²</b
                                 ><small class="block text-stone-500">{{
                                     tr('interior', 'interior')
                                 }}</small></span
@@ -553,7 +565,10 @@ const toggleFavorite = (): void => {
                             {{ tr('Detalles', 'Details') }}
                         </h2>
                         <div class="mt-5 grid gap-4 sm:grid-cols-2">
-                            <p class="flex items-center gap-3">
+                            <p
+                                v-if="property.furnishing"
+                                class="flex items-center gap-3"
+                            >
                                 <CheckCircle2 class="size-5 text-blue-700" />
                                 {{ humanize(property.furnishing) }}
                             </p>
@@ -807,11 +822,11 @@ const toggleFavorite = (): void => {
                             <p
                                 class="mt-3 flex flex-wrap gap-3 text-xs text-stone-500"
                             >
-                                <span
+                                <span v-if="item.bedrooms !== null"
                                     >{{ item.bedrooms }}
                                     {{ tr('hab.', 'beds') }}</span
                                 >
-                                <span
+                                <span v-if="item.bathrooms !== null"
                                     >{{ item.bathrooms }}
                                     {{ tr('baños', 'baths') }}</span
                                 >

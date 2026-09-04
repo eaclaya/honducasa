@@ -22,16 +22,16 @@ type MapProperty = {
     type: string;
     listingType: 'rent' | 'buy';
     location: string;
-    bedrooms: number;
-    bathrooms: string;
-    parkingSpaces: number;
+    bedrooms: number | null;
+    bathrooms: string | null;
+    parkingSpaces: number | null;
     interiorAreaM2: number | null;
-    furnishing: string;
+    furnishing: string | null;
     priceAmount: number;
     currency: string;
     priceIsConverted: boolean;
     depositAmount: number | null;
-    utilitiesIncluded: boolean;
+    utilitiesIncluded: boolean | null;
     mapLatitude: number;
     mapLongitude: number;
     primaryImage: { url: string; altText: string | null } | null;
@@ -291,8 +291,12 @@ const createPropertyPreview = (property: MapProperty): HTMLElement => {
     const features = document.createElement('p');
     features.className = 'honducasa-map-preview__features';
     features.textContent = [
-        `${property.bedrooms} ${locale.value === 'es' ? 'hab.' : 'beds'}`,
-        `${property.bathrooms} ${locale.value === 'es' ? 'baños' : 'baths'}`,
+        property.bedrooms !== null
+            ? `${property.bedrooms} ${locale.value === 'es' ? 'hab.' : 'beds'}`
+            : null,
+        property.bathrooms !== null
+            ? `${property.bathrooms} ${locale.value === 'es' ? 'baños' : 'baths'}`
+            : null,
         property.interiorAreaM2 ? `${property.interiorAreaM2} m²` : null,
     ]
         .filter(Boolean)
@@ -369,9 +373,15 @@ const createMultiPropertyPreview = (properties: MapProperty[]): HTMLElement => {
         meta.className = 'honducasa-map-preview-list__meta';
         meta.textContent = [
             humanize(property.type),
-            `${property.bedrooms} ${locale.value === 'es' ? 'hab.' : 'beds'}`,
-            `${property.bathrooms} ${locale.value === 'es' ? 'baños' : 'baths'}`,
-        ].join(' · ');
+            property.bedrooms !== null
+                ? `${property.bedrooms} ${locale.value === 'es' ? 'hab.' : 'beds'}`
+                : null,
+            property.bathrooms !== null
+                ? `${property.bathrooms} ${locale.value === 'es' ? 'baños' : 'baths'}`
+                : null,
+        ]
+            .filter(Boolean)
+            .join(' · ');
 
         const price = document.createElement('span');
         price.className = 'honducasa-map-preview-list__price';

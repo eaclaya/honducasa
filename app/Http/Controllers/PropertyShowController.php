@@ -60,7 +60,7 @@ class PropertyShowController extends Controller
 
     private function render(Property $property, bool $isPreview): Response
     {
-        $displayCurrency = $this->currencyConverter->baseCurrency();
+        $displayCurrency = $this->currencyConverter->displayCurrency();
         $propertyNormalizedPrice = $property->normalized_price_amount
             ?? $this->currencyConverter->toBase($property->price_amount, $property->currency);
 
@@ -115,7 +115,7 @@ class PropertyShowController extends Controller
                 'interiorAreaM2' => $property->interior_area_m2,
                 'lotAreaM2' => $property->lot_area_m2,
                 'yearBuilt' => $property->year_built,
-                'furnishing' => $property->furnishing->value,
+                'furnishing' => $property->furnishing?->value,
                 'description' => $property->description,
                 'priceAmount' => $this->currencyConverter->fromBase(
                     $propertyNormalizedPrice,

@@ -81,6 +81,17 @@
     ::file-selector-button {
         border-color: var(--color-gray-200, currentColor);
     }
+
+    input[type='number'] {
+        appearance: none;
+        -moz-appearance: none;
+    }
+
+    input[type='number']::-webkit-inner-spin-button,
+    input[type='number']::-webkit-outer-spin-button {
+        margin: 0;
+        -webkit-appearance: none;
+    }
 }
 
 @layer utilities {

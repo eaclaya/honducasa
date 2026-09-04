@@ -19,6 +19,11 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             locale: 'es' | 'en';
+            currency: {
+                display: string;
+                base: string;
+                supported: string[];
+            };
             auth: Auth;
             googleOneTap: {
                 clientId: string | null;

@@ -3,6 +3,7 @@ import { Link, router, usePage } from '@inertiajs/vue3';
 import { Building2, LayoutDashboard, LogOut, Menu, X } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
+import CurrencySwitcher from '@/components/CurrencySwitcher.vue';
 import GoogleOneTap from '@/components/GoogleOneTap.vue';
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -85,17 +86,23 @@ const hoverClasses = computed(() =>
             </Link>
 
             <div class="hidden items-center gap-3 sm:flex">
+                <CurrencySwitcher />
                 <LanguageSwitcher />
                 <Link
                     :href="listPropertyUrl"
-                    class="rounded-full px-4 py-3 text-sm font-semibold transition"
+                    class="rounded-full px-4 py-3 text-sm font-semibold whitespace-nowrap transition"
                     :class="
                         overlay
                             ? 'bg-primary text-primary-foreground hover:bg-primary-hover'
                             : 'bg-primary text-primary-foreground hover:bg-primary-hover'
                     "
                 >
-                    {{ tr('Publicar propiedad', 'List a property') }}
+                    <span class="lg:hidden">{{
+                        tr('Publicar', 'Publish')
+                    }}</span>
+                    <span class="hidden lg:inline">{{
+                        tr('Publicar propiedad', 'List a property')
+                    }}</span>
                 </Link>
                 <DropdownMenu v-if="page.props.auth.user">
                     <DropdownMenuTrigger as-child>
@@ -199,7 +206,10 @@ const hoverClasses = computed(() =>
                 <Link :href="listPropertyUrl">{{
                     tr('Publicar propiedad', 'List a property')
                 }}</Link>
-                <LanguageSwitcher />
+                <div class="flex items-center gap-3">
+                    <CurrencySwitcher />
+                    <LanguageSwitcher />
+                </div>
                 <template v-if="page.props.auth.user">
                     <Link :href="dashboardUrl">Dashboard</Link>
                     <Link :href="createAgency()">{{
