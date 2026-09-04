@@ -150,6 +150,32 @@ test('a suspended user cannot authenticate via Google', function () {
         ->assertSessionHasErrors('google');
 });
 
+test('Google claims a pre-provisioned password-less account by email instead of rejecting it', function () {
+    $superadmin = User::factory()->withPersonalTeam()->create([
+        'email' => 'claim-me@example.com',
+        'password' => null,
+    ]);
+
+    Socialite::fake('google', SocialiteUser::fake([
+        'id' => 'google-subject-claim',
+        'name' => 'Real Superadmin',
+        'email' => 'claim-me@example.com',
+        'email_verified' => true,
+    ]));
+
+    $response = $this->get(route('auth.google.callback'));
+
+    $this->assertAuthenticatedAs($superadmin);
+    $response->assertRedirect();
+    expect(User::query()->where('email', 'claim-me@example.com')->count())->toBe(1);
+
+    $this->assertDatabaseHas('oauth_identities', [
+        'user_id' => $superadmin->id,
+        'provider' => IdentityProvider::Google->value,
+        'provider_subject' => 'google-subject-claim',
+    ]);
+});
+
 test('Google does not silently link an existing manual account by email', function () {
     User::factory()->create(['email' => 'existing@example.com']);
 

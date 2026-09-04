@@ -39,14 +39,14 @@ class SaveListingRequest extends FormRequest
             'price_amount' => ['required', 'integer', 'min:1'],
             'currency' => ['required', Rule::in(array_keys(config('currencies.supported', [])))],
             'deposit_amount' => ['nullable', 'integer', 'min:0'],
-            'utilities_included' => ['required', 'boolean'],
-            'bedrooms' => ['required', 'integer', 'min:0', 'max:20'],
-            'bathrooms' => ['required', 'numeric', 'min:0.5', 'max:20'],
-            'parking_spaces' => ['required', 'integer', 'min:0', 'max:20'],
-            'interior_area_m2' => ['nullable', 'integer', 'min:1'],
-            'lot_area_m2' => ['nullable', 'integer', 'min:1'],
-            'year_built' => ['nullable', 'integer', 'min:1800', 'max:'.now()->year],
-            'furnishing' => ['required', Rule::enum(Furnishing::class)],
+            'utilities_included' => ['nullable', 'boolean'],
+            'bedrooms' => $this->featureRules('bedrooms', ['integer', 'min:0', 'max:20']),
+            'bathrooms' => $this->featureRules('bathrooms', ['numeric', 'min:0.5', 'max:20']),
+            'parking_spaces' => $this->featureRules('parking_spaces', ['integer', 'min:0', 'max:20']),
+            'interior_area_m2' => $this->featureRules('interior_area_m2', ['integer', 'min:1']),
+            'lot_area_m2' => $this->featureRules('lot_area_m2', ['integer', 'min:1']),
+            'year_built' => $this->featureRules('year_built', ['integer', 'min:1800', 'max:'.now()->year]),
+            'furnishing' => $this->featureRules('furnishing', [Rule::enum(Furnishing::class)]),
             'description' => ['nullable', 'string', 'max:5000'],
             'address_line' => ['nullable', 'string', 'max:255'],
             'location_mode' => ['required', Rule::in([LocationPrecision::Exact->value, LocationPrecision::Approximate->value])],
@@ -82,10 +82,47 @@ class SaveListingRequest extends FormRequest
             ]);
         }
 
+        $this->clearInapplicablePropertyFields();
+
         $this->merge([
             'location_id' => $this->cityFromMapPin()?->getKey(),
             'status' => $this->statusAllowedByPhotos(),
         ]);
+    }
+
+    /**
+     * @param  list<mixed>  $rules
+     * @return list<mixed>
+     */
+    private function featureRules(string $field, array $rules): array
+    {
+        $type = PropertyType::tryFrom((string) $this->input('type'));
+        $required = $type !== null && in_array($field, $type->requiredFeatureFields(), true);
+
+        return [$required ? 'required' : 'nullable', ...$rules];
+    }
+
+    private function clearInapplicablePropertyFields(): void
+    {
+        $type = PropertyType::tryFrom((string) $this->input('type'));
+
+        if ($type === null) {
+            return;
+        }
+
+        $cleared = collect(PropertyType::cases())
+            ->flatMap(fn (PropertyType $propertyType) => $propertyType->featureFields())
+            ->unique()
+            ->reject(fn (string $field) => in_array($field, $type->featureFields(), true))
+            ->mapWithKeys(fn (string $field) => [$field => null])
+            ->all();
+
+        if ($this->input('listing_type') !== ListingType::Rent->value || ! $type->supportsRentalTerms()) {
+            $cleared['deposit_amount'] = null;
+            $cleared['utilities_included'] = null;
+        }
+
+        $this->merge($cleared);
     }
 
     /**

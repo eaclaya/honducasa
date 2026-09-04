@@ -4,12 +4,26 @@ namespace App\Support;
 
 use DomainException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class CurrencyConverter
 {
     public function baseCurrency(): string
     {
         return (string) config('currencies.base');
+    }
+
+    /**
+     * The currency prices are rendered in for this request. Set from the
+     * visitor's stored preference by `SetDisplayCurrency`, falling back to base.
+     */
+    public function displayCurrency(): string
+    {
+        $display = config('currencies.display');
+
+        return is_string($display) && in_array($display, $this->supportedCurrencies(), true)
+            ? $display
+            : $this->baseCurrency();
     }
 
     /** @return list<string> */
@@ -20,13 +34,25 @@ class CurrencyConverter
 
     public function rateToBase(string $currency): string
     {
-        $rate = config("currencies.supported.{$currency}.rate_to_base");
+        $rate = Cache::get(
+            $this->rateCacheKey($currency),
+            config("currencies.supported.{$currency}.rate_to_base"),
+        );
 
         if (! is_numeric($rate) || bccomp((string) $rate, '0', 10) <= 0) {
             throw new DomainException("No valid exchange rate is configured for {$currency}.");
         }
 
         return (string) $rate;
+    }
+
+    public function storeRateToBase(string $currency, int|float|string $rate): void
+    {
+        if (! is_numeric($rate) || bccomp((string) $rate, '0', 10) <= 0) {
+            throw new DomainException("Cannot store an invalid exchange rate for {$currency}.");
+        }
+
+        Cache::forever($this->rateCacheKey($currency), (string) $rate);
     }
 
     public function toBase(int|float|string $amount, string $currency): string
@@ -53,5 +79,10 @@ class CurrencyConverter
             'normalization_rate' => $this->rateToBase($currency),
             'price_normalized_at' => now(),
         ];
+    }
+
+    private function rateCacheKey(string $currency): string
+    {
+        return "currencies.rates.{$currency}.{$this->baseCurrency()}";
     }
 }

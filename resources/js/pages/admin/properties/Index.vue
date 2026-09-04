@@ -269,15 +269,18 @@ const setStatus = (property: PropertyRow, status: string): void => {
                     <option value="apartment">
                         {{ tr('Apartamento', 'Apartment') }}
                     </option>
-                    <option value="condominium">
-                        {{ tr('Condominio', 'Condominium') }}
+                    <option value="commercial_space">
+                        {{ tr('Local Comercial', 'Commercial Space') }}
                     </option>
-                    <option value="townhouse">
-                        {{ tr('Townhouse', 'Townhouse') }}
+                    <option value="land">{{ tr('Terreno', 'Land') }}</option>
+                    <option value="office_space">
+                        {{ tr('Local Para Oficina', 'Office Space') }}
                     </option>
-                    <option value="room">{{ tr('Habitación', 'Room') }}</option>
-                    <option value="studio">
-                        {{ tr('Estudio', 'Studio') }}
+                    <option value="warehouse">
+                        {{ tr('Bodega', 'Warehouse') }}
+                    </option>
+                    <option value="building">
+                        {{ tr('Edificio', 'Building') }}
                     </option>
                 </select>
             </label>

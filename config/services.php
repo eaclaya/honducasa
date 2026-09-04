@@ -54,4 +54,8 @@ return [
         'url' => env('NOMINATIM_URL', 'http://localhost:8089'),
     ],
 
+    'frankfurter' => [
+        'url' => env('FRANKFURTER_URL', 'https://api.frankfurter.dev/v2'),
+    ],
+
 ];

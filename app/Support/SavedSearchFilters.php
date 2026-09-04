@@ -26,6 +26,7 @@ class SavedSearchFilters
         'sort',
         'latitude',
         'longitude',
+        'polygon',
     ];
 
     /**
@@ -41,6 +42,20 @@ class SavedSearchFilters
 
         if (($normalized['sort'] ?? null) === 'newest') {
             unset($normalized['sort']);
+        }
+
+        // Validated but not yet cast: request classes deliberately preserve
+        // whatever `explode()` produced so validation can reject a malformed
+        // segment (see PolygonQueryParameter). Cast to float only now that
+        // it's passed, so a saved search's fingerprint matches the float
+        // points RentalSearchController builds for the live equivalent
+        // search — a string/float mismatch here would make "already saved"
+        // detection silently never match a polygon search.
+        if (isset($normalized['polygon']) && is_array($normalized['polygon'])) {
+            $normalized['polygon'] = array_map(
+                fn (array $point): array => [(float) $point[0], (float) $point[1]],
+                $normalized['polygon'],
+            );
         }
 
         ksort($normalized);

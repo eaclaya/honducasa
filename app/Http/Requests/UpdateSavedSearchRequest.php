@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\SavedSearch;
+use App\Support\PolygonQueryParameter;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateSavedSearchRequest extends FormRequest
@@ -11,6 +12,15 @@ class UpdateSavedSearchRequest extends FormRequest
     {
         return $this->route('saved_search') instanceof SavedSearch
             && $this->route('saved_search')->user_id === $this->user()?->id;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $points = PolygonQueryParameter::expand($this->input('filters.polygon'));
+
+        if ($points !== null) {
+            $this->merge(['filters' => [...$this->input('filters', []), 'polygon' => $points]]);
+        }
     }
 
     public function rules(): array

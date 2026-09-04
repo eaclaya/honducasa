@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Data\GeoPoint;
+use App\Data\GeoPolygon;
 use App\Http\Requests\RentalSearchRequest;
 use App\Models\Property;
 use App\Support\CurrencyConverter;
@@ -25,7 +26,7 @@ class RentalSearchController extends Controller
         $propertyType = $filters['property_type'] ?? null;
         $listingType = $filters['listing_type'] ?? null;
         $sort = $filters['sort'] ?? 'newest';
-        $displayCurrency = $filters['currency'] ?? $this->currencyConverter->baseCurrency();
+        $displayCurrency = $filters['currency'] ?? $this->currencyConverter->displayCurrency();
         $minimumNormalizedPrice = isset($filters['min_price'])
             ? $this->currencyConverter->toBase($filters['min_price'], $displayCurrency)
             : null;
@@ -34,6 +35,10 @@ class RentalSearchController extends Controller
             : null;
         $hasBounds = isset($filters['west'], $filters['south'], $filters['east'], $filters['north']);
         $hasNearbyOrigin = isset($filters['latitude'], $filters['longitude']);
+        $hasPolygonArea = isset($filters['polygon']);
+        $polygonPoints = $hasPolygonArea
+            ? array_map(fn (array $point): array => [(float) $point[0], (float) $point[1]], $filters['polygon'])
+            : null;
         $favoritePropertyIds = $request->user()?->propertyFavorites()->pluck('property_id')->all() ?? [];
         $currentFingerprint = SavedSearchFilters::fingerprint($filters);
         $matchingSavedSearch = $request->user()?->savedSearches()
@@ -61,18 +66,29 @@ class RentalSearchController extends Controller
             ->when(isset($filters['bedrooms']), fn (Builder $query) => $query->where('bedrooms', '>=', $filters['bedrooms']))
             ->when(isset($filters['bathrooms']), fn (Builder $query) => $query->where('bathrooms', '>=', $filters['bathrooms']))
             ->when(isset($filters['parking_spaces']), fn (Builder $query) => $query->where('parking_spaces', '>=', $filters['parking_spaces']))
-            ->when(isset($filters['min_area']), fn (Builder $query) => $query->where('interior_area_m2', '>=', $filters['min_area']))
-            ->when(isset($filters['max_area']), fn (Builder $query) => $query->where('interior_area_m2', '<=', $filters['max_area']))
+            ->when(isset($filters['min_area']) || isset($filters['max_area']), fn (Builder $query) => $query->withinAreaRange(
+                isset($filters['min_area']) ? (int) $filters['min_area'] : null,
+                isset($filters['max_area']) ? (int) $filters['max_area'] : null,
+                $propertyType,
+            ))
             ->when($filters['furnishing'] ?? null, fn (Builder $query, string $furnishing) => $query->where('furnishing', $furnishing))
             ->when(isset($filters['utilities_included']), fn (Builder $query) => $query->where('utilities_included', $filters['utilities_included']))
-            ->when($hasNearbyOrigin, fn (Builder $query) => $query->withinRadius(
-                new GeoPoint((float) $filters['latitude'], (float) $filters['longitude']),
-                2_000,
+            ->when($hasPolygonArea, fn (Builder $query) => $query->withinPolygon(
+                new GeoPolygon($polygonPoints),
             ))
-            ->when($hasBounds, fn (Builder $query) => $query->whereRaw(
+            ->when(! $hasPolygonArea && $hasNearbyOrigin, fn (Builder $query) => $query->withinRadius(
+                new GeoPoint((float) $filters['latitude'], (float) $filters['longitude']),
+                Property::NEARBY_SEARCH_RADIUS_METERS,
+            ))
+            ->when(! $hasPolygonArea && $hasBounds, fn (Builder $query) => $query->whereRaw(
                 'ST_Intersects(coordinates, ST_MakeEnvelope(?, ?, ?, ?, 4326)::geography)',
                 [$filters['west'], $filters['south'], $filters['east'], $filters['north']],
             ));
+
+        // A nearby search narrows results to a radius; it doesn't order them.
+        // `withinRadius` adds its own nearest-first ordering, so drop that before
+        // applying the requested sort — otherwise the sort selector no-ops.
+        $query->reorder();
 
         match ($sort) {
             'price_asc' => $query->orderBy('normalized_price_amount')->orderByDesc('id'),
@@ -82,6 +98,7 @@ class RentalSearchController extends Controller
 
         $properties = $query
             ->paginate(18)
+            ->onEachSide(1)
             ->withQueryString()
             ->through(function (Property $property) use ($favoritePropertyIds, $displayCurrency) {
                 $images = $property->getMedia('photos')
@@ -106,7 +123,7 @@ class RentalSearchController extends Controller
                     'bathrooms' => $property->bathrooms,
                     'parkingSpaces' => $property->parking_spaces,
                     'interiorAreaM2' => $property->interior_area_m2,
-                    'furnishing' => $property->furnishing->value,
+                    'furnishing' => $property->furnishing?->value,
                     'priceAmount' => $this->currencyConverter->fromBase($normalizedPrice, $displayCurrency),
                     'currency' => $displayCurrency,
                     'originalPriceAmount' => $property->price_amount,
@@ -137,6 +154,7 @@ class RentalSearchController extends Controller
                 'parkingSpaces' => isset($filters['parking_spaces']) ? (string) $filters['parking_spaces'] : '',
                 'minArea' => isset($filters['min_area']) ? (string) $filters['min_area'] : '',
                 'maxArea' => isset($filters['max_area']) ? (string) $filters['max_area'] : '',
+                'areaUnit' => $filters['area_unit'] ?? 'm2',
                 'furnishing' => $filters['furnishing'] ?? '',
                 'utilitiesIncluded' => isset($filters['utilities_included']) ? (bool) $filters['utilities_included'] : null,
                 'sort' => $sort,
@@ -146,10 +164,10 @@ class RentalSearchController extends Controller
                 'north' => $hasBounds ? (float) $filters['north'] : null,
                 'latitude' => $hasNearbyOrigin ? (float) $filters['latitude'] : null,
                 'longitude' => $hasNearbyOrigin ? (float) $filters['longitude'] : null,
-                'radiusMeters' => $hasNearbyOrigin ? 2_000 : null,
+                'radiusMeters' => $hasNearbyOrigin ? Property::NEARBY_SEARCH_RADIUS_METERS : null,
+                'polygon' => $polygonPoints,
             ],
             'properties' => $properties,
-            'currencies' => $this->currencyConverter->supportedCurrencies(),
             'baseCurrency' => $this->currencyConverter->baseCurrency(),
             'isSearchSaved' => $matchingSavedSearch !== null,
             'savedSearch' => $activeSavedSearch === null ? null : [

@@ -20,6 +20,16 @@ Schedule::command('app:pause-expired-trial-listings')
     ->withoutOverlapping()
     ->description('Pause listings for teams whose trial ended without a subscription');
 
+Schedule::command('app:update-exchange-rates')
+    ->dailyAt('00:05')
+    ->withoutOverlapping()
+    ->description('Update exchange rates from Frankfurter');
+
+Schedule::command('app:normalize-property-prices')
+    ->dailyAt('00:10')
+    ->withoutOverlapping()
+    ->description('Refresh normalized property prices with the latest exchange rates');
+
 Schedule::command('horizon:snapshot')
     ->everyFiveMinutes()
     ->description('Capture Horizon queue metrics');

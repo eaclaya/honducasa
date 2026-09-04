@@ -53,13 +53,21 @@ const handleKeydown = (event: KeyboardEvent): void => {
                 aria-hidden="true"
             />
             <span
-                class="relative z-10 transition-opacity"
-                :class="locale === 'es' ? 'opacity-100' : 'opacity-55'"
+                class="relative z-10 transition"
+                :class="
+                    locale === 'es'
+                        ? 'text-primary-foreground opacity-100'
+                        : 'opacity-55'
+                "
                 >ES</span
             >
             <span
-                class="relative z-10 transition-opacity"
-                :class="locale === 'en' ? 'opacity-100' : 'opacity-55'"
+                class="relative z-10 transition"
+                :class="
+                    locale === 'en'
+                        ? 'text-primary-foreground opacity-100'
+                        : 'opacity-55'
+                "
                 >EN</span
             >
         </button>

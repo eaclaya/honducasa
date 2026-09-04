@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useHttp } from '@inertiajs/vue3';
-import { LoaderCircle, LocateFixed, MapPin } from '@lucide/vue';
+import { LassoSelect, LoaderCircle, LocateFixed, MapPin } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { search as searchLocations } from '@/routes/locations';
 
@@ -19,6 +19,7 @@ const props = withDefaults(
         variant?: 'hero' | 'results';
         placeholder?: string;
         showNearMe?: boolean;
+        showDrawArea?: boolean;
         locating?: boolean;
         locationError?: string;
     }>(),
@@ -26,6 +27,7 @@ const props = withDefaults(
         variant: 'results',
         placeholder: '',
         showNearMe: false,
+        showDrawArea: false,
         locating: false,
         locationError: '',
     },
@@ -35,6 +37,7 @@ const emit = defineEmits<{
     'update:modelValue': [value: string];
     select: [value: string];
     nearby: [];
+    draw: [];
     input: [];
 }>();
 
@@ -191,6 +194,7 @@ onBeforeUnmount(() => {
             v-if="
                 open &&
                 (showNearMe ||
+                    showDrawArea ||
                     suggestions.length > 0 ||
                     http.processing ||
                     searched)
@@ -224,8 +228,30 @@ onBeforeUnmount(() => {
                     }}</strong>
                     <small class="text-stone-500">{{
                         tr(
-                            'Propiedades dentro de 2 km',
-                            'Properties within 2 km',
+                            'Propiedades dentro de 5 km',
+                            'Properties within 5 km',
+                        )
+                    }}</small>
+                </span>
+            </button>
+
+            <button
+                v-if="showDrawArea"
+                type="button"
+                class="flex w-full items-center gap-3 border-b border-stone-200 py-3 text-left transition hover:bg-blue-50"
+                :class="popupContentPaddingClasses"
+                @mousedown.prevent
+                @click="emit('draw')"
+            >
+                <LassoSelect class="size-5 text-blue-700" />
+                <span>
+                    <strong class="block text-sm">{{
+                        tr('Dibujar en el mapa', 'Draw on the map')
+                    }}</strong>
+                    <small class="text-stone-500">{{
+                        tr(
+                            'Marca los límites de tu búsqueda',
+                            'Mark your search boundaries',
                         )
                     }}</small>
                 </span>

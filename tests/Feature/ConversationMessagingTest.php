@@ -136,3 +136,34 @@ test('the inbox returns property context without exposing private contact detail
             ->missing('selected.email')
             ->missing('selected.phone'));
 });
+
+test('the inbox can be filtered to conversations for one listing', function () {
+    $user = User::factory()->create();
+    $firstProperty = Property::factory()->create([
+        'created_by' => $user->id,
+        'team_id' => null,
+        'name' => 'Casa Uno',
+    ]);
+    $secondProperty = Property::factory()->create([
+        'created_by' => $user->id,
+        'team_id' => null,
+        'name' => 'Casa Dos',
+    ]);
+    $firstConversation = Conversation::factory()->create([
+        'property_id' => $firstProperty->id,
+        'team_id' => null,
+    ]);
+    Conversation::factory()->create([
+        'property_id' => $secondProperty->id,
+        'team_id' => null,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('messages.show', ['listing' => $firstProperty->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('messages/Index')
+            ->has('conversations', 1)
+            ->where('conversations.0.id', $firstConversation->id)
+            ->where('selected.propertyName', 'Casa Uno'));
+});

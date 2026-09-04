@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Data\GeoPoint;
+use App\Data\GeoPolygon;
 use App\Enums\ApproximateLocationShape;
 use App\Enums\Furnishing;
 use App\Enums\ListingStatus;
@@ -44,13 +45,13 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property ApproximateLocationShape|null $approximate_shape
  * @property int|null $approximate_radius_meters
  * @property array<string, mixed>|null $approximate_polygon
- * @property int $bedrooms
- * @property string $bathrooms
- * @property int $parking_spaces
+ * @property int|null $bedrooms
+ * @property string|null $bathrooms
+ * @property int|null $parking_spaces
  * @property int|null $interior_area_m2
  * @property int|null $lot_area_m2
  * @property int|null $year_built
- * @property Furnishing $furnishing
+ * @property Furnishing|null $furnishing
  * @property int $price_amount
  * @property string $currency
  * @property string|null $normalized_price_amount
@@ -58,7 +59,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string|null $normalization_rate
  * @property Carbon|null $price_normalized_at
  * @property int|null $deposit_amount
- * @property bool $utilities_included
+ * @property bool|null $utilities_included
  * @property string|null $description
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -107,9 +108,18 @@ class Property extends Model implements HasMedia
     /** @use HasFactory<PropertyFactory> */
     use HasFactory, InteractsWithMedia, SoftDeletes;
 
+    /**
+     * The radius a "search near me" origin filters to — shared by the live
+     * rental search, the results-page label, and saved-search alert
+     * matching, so all three stay in sync.
+     */
+    public const int NEARBY_SEARCH_RADIUS_METERS = 5_000;
+
     private const string DISTANCE_SELECT = 'ST_Distance(coordinates, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography) AS distance_meters';
 
     private const string WITHIN_RADIUS_CONDITION = 'ST_DWithin(coordinates, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)';
+
+    private const string WITHIN_POLYGON_CONDITION = 'ST_Intersects(coordinates, ST_GeomFromEWKT(?)::geography)';
 
     /**
      * Get the agency that owns the property, if this is an agency listing.
@@ -191,6 +201,51 @@ class Property extends Model implements HasMedia
             ])
             ->orderBy('distance_meters')
             ->orderByDesc($query->getModel()->qualifyColumn('id'));
+    }
+
+    /**
+     * Limit properties to those inside a user-drawn search area.
+     *
+     * @param  Builder<Property>  $query
+     * @return Builder<Property>
+     */
+    #[Scope]
+    protected function withinPolygon(Builder $query, GeoPolygon $polygon): Builder
+    {
+        return $query->whereRaw(self::WITHIN_POLYGON_CONDITION, [$polygon->toPostgisPolygon()]);
+    }
+
+    /**
+     * Filter by the meaningful area for a property type. Land uses lot area;
+     * built properties use interior area.
+     *
+     * @param  Builder<Property>  $query
+     * @return Builder<Property>
+     */
+    #[Scope]
+    protected function withinAreaRange(Builder $query, ?int $minimum, ?int $maximum, ?string $propertyType = null): Builder
+    {
+        $column = $propertyType === PropertyType::Land->value
+            ? 'lot_area_m2'
+            : 'interior_area_m2';
+
+        if ($propertyType !== null) {
+            return $query
+                ->when($minimum !== null, fn (Builder $query) => $query->where($column, '>=', $minimum))
+                ->when($maximum !== null, fn (Builder $query) => $query->where($column, '<=', $maximum));
+        }
+
+        return $query->where(function (Builder $query) use ($minimum, $maximum): void {
+            $query->where(function (Builder $query) use ($minimum, $maximum): void {
+                $query->where('type', PropertyType::Land->value)
+                    ->when($minimum !== null, fn (Builder $query) => $query->where('lot_area_m2', '>=', $minimum))
+                    ->when($maximum !== null, fn (Builder $query) => $query->where('lot_area_m2', '<=', $maximum));
+            })->orWhere(function (Builder $query) use ($minimum, $maximum): void {
+                $query->where('type', '!=', PropertyType::Land->value)
+                    ->when($minimum !== null, fn (Builder $query) => $query->where('interior_area_m2', '>=', $minimum))
+                    ->when($maximum !== null, fn (Builder $query) => $query->where('interior_area_m2', '<=', $maximum));
+            });
+        });
     }
 
     /**

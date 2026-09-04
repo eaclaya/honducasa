@@ -86,6 +86,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Superadmin Email
+    |--------------------------------------------------------------------------
+    |
+    | The account SuperAdminSeeder provisions with admin access and that
+    | DemoPropertySeeder attributes seeded listings to. Read via config(),
+    | never env() directly — application code reads a cached config array
+    | in production, where raw env() calls return null.
+    |
+    */
+
+    'superadmin_email' => env('SUPERADMIN_EMAIL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Encryption Key
     |--------------------------------------------------------------------------
     |

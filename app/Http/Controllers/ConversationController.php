@@ -31,6 +31,7 @@ class ConversationController extends Controller
                 ->where('renter_id', $user->id)
                 ->orWhereIn('team_id', $teamIds)
                 ->orWhereHas('property', fn ($property) => $property->whereNull('team_id')->where('created_by', $user->id)))
+            ->when($request->integer('listing'), fn ($query, int $listingId) => $query->where('property_id', $listingId))
             ->latest('last_message_at')
             ->get();
 

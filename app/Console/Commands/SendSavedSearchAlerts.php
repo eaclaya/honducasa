@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Data\GeoPoint;
+use App\Data\GeoPolygon;
 use App\Models\Property;
 use App\Models\SavedSearch;
 use App\Notifications\SavedSearchMatchesFound;
@@ -56,13 +57,19 @@ class SendSavedSearchAlerts extends Command
             ->when(isset($filters['bedrooms']), fn (Builder $query) => $query->where('bedrooms', '>=', $filters['bedrooms']))
             ->when(isset($filters['bathrooms']), fn (Builder $query) => $query->where('bathrooms', '>=', $filters['bathrooms']))
             ->when(isset($filters['parking_spaces']), fn (Builder $query) => $query->where('parking_spaces', '>=', $filters['parking_spaces']))
-            ->when(isset($filters['min_area']), fn (Builder $query) => $query->where('interior_area_m2', '>=', $filters['min_area']))
-            ->when(isset($filters['max_area']), fn (Builder $query) => $query->where('interior_area_m2', '<=', $filters['max_area']))
+            ->when(isset($filters['min_area']) || isset($filters['max_area']), fn (Builder $query) => $query->withinAreaRange(
+                isset($filters['min_area']) ? (int) $filters['min_area'] : null,
+                isset($filters['max_area']) ? (int) $filters['max_area'] : null,
+                $filters['property_type'] ?? null,
+            ))
             ->when($filters['furnishing'] ?? null, fn (Builder $query, string $value) => $query->where('furnishing', $value))
             ->when(isset($filters['utilities_included']), fn (Builder $query) => $query->where('utilities_included', $filters['utilities_included']))
-            ->when(isset($filters['latitude'], $filters['longitude']), fn (Builder $query) => $query->withinRadius(
+            ->when(isset($filters['polygon']), fn (Builder $query) => $query->withinPolygon(
+                new GeoPolygon($filters['polygon']),
+            ))
+            ->when(! isset($filters['polygon']) && isset($filters['latitude'], $filters['longitude']), fn (Builder $query) => $query->withinRadius(
                 new GeoPoint((float) $filters['latitude'], (float) $filters['longitude']),
-                2_000,
+                Property::NEARBY_SEARCH_RADIUS_METERS,
             ));
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\Furnishing;
 use App\Enums\ListingType;
 use App\Enums\PropertyType;
+use App\Support\PolygonQueryParameter;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -18,6 +19,15 @@ class StoreSavedSearchRequest extends FormRequest
     public function rules(): array
     {
         return self::creationRules();
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $points = PolygonQueryParameter::expand($this->input('filters.polygon'));
+
+        if ($points !== null) {
+            $this->merge(['filters' => [...$this->input('filters', []), 'polygon' => $points]]);
+        }
     }
 
     /**
@@ -46,6 +56,10 @@ class StoreSavedSearchRequest extends FormRequest
             $prefix.'filters.sort' => ['nullable', Rule::in(['newest', 'price_asc', 'price_desc'])],
             $prefix.'filters.latitude' => ['nullable', 'required_with:'.$prefix.'filters.longitude', 'numeric', 'between:-90,90'],
             $prefix.'filters.longitude' => ['nullable', 'required_with:'.$prefix.'filters.latitude', 'numeric', 'between:-180,180'],
+            $prefix.'filters.polygon' => ['nullable', 'array', 'min:4', 'max:30'],
+            $prefix.'filters.polygon.*' => ['array', 'size:2'],
+            $prefix.'filters.polygon.*.0' => ['numeric', 'between:-89.4,-83.1'],
+            $prefix.'filters.polygon.*.1' => ['numeric', 'between:12.9,16.6'],
             $prefix.'alerts_enabled' => ['sometimes', 'boolean'],
         ];
     }

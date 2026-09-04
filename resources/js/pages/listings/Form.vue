@@ -22,8 +22,10 @@ import FilePondPluginImageTransform from 'filepond-plugin-image-transform';
 import { computed, nextTick, reactive } from 'vue';
 import { ref, watch } from 'vue';
 import vueFilePond from 'vue-filepond';
+import AreaUnitInput from '@/components/AreaUnitInput.vue';
 import ListingPublishModal from '@/components/ListingPublishModal.vue';
 import PropertyLocationPicker from '@/components/PropertyLocationPicker.vue';
+import type { AreaUnit } from '@/lib/areaUnits';
 import { index, store, update } from '@/routes/listings';
 import {
     destroy as destroyUpload,
@@ -79,6 +81,19 @@ interface ListingFormData {
     description: string | number;
     status: string | number;
 }
+type FeatureField =
+    | 'bedrooms'
+    | 'bathrooms'
+    | 'parking_spaces'
+    | 'interior_area_m2'
+    | 'lot_area_m2'
+    | 'year_built'
+    | 'furnishing';
+type PropertyTypeFieldConfig = {
+    fields: FeatureField[];
+    required: FeatureField[];
+    supportsRentalTerms: boolean;
+};
 type ListingPhoto = {
     id: number;
     url: string;
@@ -94,6 +109,7 @@ const props = defineProps<{
     listing: Listing | null;
     locations: Location[];
     currencies: string[];
+    propertyTypeFields: Record<string, PropertyTypeFieldConfig>;
     oldInput: Record<string, FormValue>;
     photoEnhancementsRemaining: number;
 }>();
@@ -183,6 +199,98 @@ const formData = reactive<ListingFormData>({
     description: value('description'),
     status: value('status', 'draft'),
 });
+const areaUnits = reactive<
+    Record<'interior_area_m2' | 'lot_area_m2', AreaUnit>
+>({
+    interior_area_m2: 'm2',
+    lot_area_m2: String(formData.type) === 'land' ? 'vara2' : 'm2',
+});
+
+const selectedTypeFields = computed<PropertyTypeFieldConfig>(
+    () =>
+        props.propertyTypeFields[String(formData.type)] ?? {
+            fields: [],
+            required: [],
+            supportsRentalTerms: false,
+        },
+);
+const featureFieldDefinitions = computed(
+    () =>
+        [
+            { n: 'bedrooms', l: tr('Habitaciones', 'Bedrooms') },
+            { n: 'bathrooms', l: tr('Baños', 'Bathrooms') },
+            {
+                n: 'parking_spaces',
+                l: tr('Estacionamientos', 'Parking'),
+            },
+            {
+                n: 'interior_area_m2',
+                l: tr('Área interior', 'Interior area'),
+            },
+            { n: 'lot_area_m2', l: tr('Área del terreno', 'Lot area') },
+            {
+                n: 'year_built',
+                l: tr('Año de construcción', 'Year built'),
+            },
+        ].filter((field) =>
+            selectedTypeFields.value.fields.includes(field.n as FeatureField),
+        ) as Array<{ n: Exclude<FeatureField, 'furnishing'>; l: string }>,
+);
+const showsRentalTerms = computed(
+    () =>
+        formData.listing_type === 'rent' &&
+        selectedTypeFields.value.supportsRentalTerms,
+);
+const featureIsRequired = (field: FeatureField): boolean =>
+    selectedTypeFields.value.required.includes(field);
+const currencySymbol = computed(() =>
+    String(formData.currency) === 'HNL' ? 'L' : '$',
+);
+const isAreaField = (
+    field: FeatureField,
+): field is 'interior_area_m2' | 'lot_area_m2' =>
+    field === 'interior_area_m2' || field === 'lot_area_m2';
+
+watch(
+    () => formData.type,
+    () => {
+        if (String(formData.type) === 'land' && formData.lot_area_m2 === '') {
+            areaUnits.lot_area_m2 = 'vara2';
+        }
+
+        const allFields: FeatureField[] = [
+            'bedrooms',
+            'bathrooms',
+            'parking_spaces',
+            'interior_area_m2',
+            'lot_area_m2',
+            'year_built',
+            'furnishing',
+        ];
+
+        allFields
+            .filter((field) => !selectedTypeFields.value.fields.includes(field))
+            .forEach((field) => {
+                formData[field] = '';
+            });
+
+        if (!showsRentalTerms.value) {
+            formData.deposit_amount = '';
+            formData.utilities_included = false;
+        }
+    },
+    { immediate: true },
+);
+
+watch(
+    () => formData.listing_type,
+    () => {
+        if (!showsRentalTerms.value) {
+            formData.deposit_amount = '';
+            formData.utilities_included = false;
+        }
+    },
+);
 
 // --- Photo uploads (FilePond + Spatie Media Library) ---------------------
 
@@ -852,10 +960,13 @@ const confirmSave = (status: SaveStatus, submit: () => void): void => {
                     >
                         <option value="house">Casa</option>
                         <option value="apartment">Apartamento</option>
-                        <option value="condominium">Condominio</option>
-                        <option value="townhouse">Townhouse</option>
-                        <option value="studio">Estudio</option>
-                        <option value="room">Habitación</option></select
+                        <option value="commercial_space">
+                            Local Comercial
+                        </option>
+                        <option value="land">Terreno</option>
+                        <option value="office_space">Local Para Oficina</option>
+                        <option value="warehouse">Bodega</option>
+                        <option value="building">Edificio</option></select
                     ><small class="text-destructive">{{
                         errors.type
                     }}</small></label
@@ -966,80 +1077,116 @@ const confirmSave = (status: SaveStatus, submit: () => void): void => {
                 <h2 class="text-xl font-semibold md:col-span-3">
                     {{ tr('Precio y características', 'Price and features') }}
                 </h2>
-                <label class="text-sm font-medium"
-                    >{{ tr('Precio', 'Price')
-                    }}<input
-                        name="price_amount"
-                        type="number"
-                        min="1"
-                        v-model="formData.price_amount"
-                        class="mt-2 w-full rounded-xl border bg-background px-4 py-3"
-                        @change="validate('price_amount')"
-                    /><small class="text-destructive">{{
-                        errors.price_amount
-                    }}</small></label
-                ><label class="text-sm font-medium"
-                    >Moneda<select
-                        name="currency"
-                        v-model="formData.currency"
-                        class="mt-2 w-full rounded-xl border bg-background px-4 py-3"
-                        @change="validate('currency')"
+                <label class="text-sm font-medium md:col-span-2"
+                    >{{ tr('Precio', 'Price') }}
+                    <div
+                        class="mt-2 flex min-w-0 overflow-hidden rounded-xl border border-input bg-background text-base focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20"
                     >
-                        <option
-                            v-for="currency in currencies"
-                            :key="currency"
-                            :value="currency"
+                        <span
+                            class="flex items-center pl-4 text-muted-foreground"
+                            aria-hidden="true"
+                            >{{ currencySymbol }}</span
                         >
-                            {{ currency }}
-                        </option></select
-                    ><small class="text-destructive">{{
+                        <input
+                            name="price_amount"
+                            type="number"
+                            min="1"
+                            placeholder="0.00"
+                            v-model="formData.price_amount"
+                            class="min-w-0 flex-1 appearance-none bg-transparent px-2 py-3 outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            @change="validate('price_amount')"
+                        />
+                        <select
+                            name="currency"
+                            v-model="formData.currency"
+                            :aria-label="tr('Moneda', 'Currency')"
+                            class="shrink-0 bg-transparent px-3 py-3 font-medium text-muted-foreground outline-none sm:px-4"
+                            @change="validate('currency')"
+                        >
+                            <option
+                                v-for="currency in currencies"
+                                :key="currency"
+                                :value="currency"
+                            >
+                                {{ currency }}
+                            </option>
+                        </select>
+                    </div>
+                    <small class="block text-destructive">{{
+                        errors.price_amount
+                    }}</small>
+                    <small class="block text-destructive">{{
                         errors.currency
                     }}</small></label
-                ><label class="text-sm font-medium"
-                    >{{ tr('Depósito', 'Deposit')
-                    }}<input
-                        name="deposit_amount"
-                        type="number"
-                        v-model="formData.deposit_amount"
-                        class="mt-2 w-full rounded-xl border bg-background px-4 py-3"
-                        @change="validate('deposit_amount')"
-                    /><small class="text-destructive">{{
+                ><label v-if="showsRentalTerms" class="text-sm font-medium"
+                    >{{ tr('Depósito', 'Deposit') }}
+                    <div
+                        class="mt-2 flex min-w-0 overflow-hidden rounded-xl border border-input bg-background text-base focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20"
+                    >
+                        <span
+                            class="flex items-center pl-4 text-muted-foreground"
+                            aria-hidden="true"
+                            >{{ currencySymbol }}</span
+                        >
+                        <input
+                            name="deposit_amount"
+                            type="number"
+                            min="0"
+                            placeholder="0.00"
+                            v-model="formData.deposit_amount"
+                            class="min-w-0 flex-1 appearance-none bg-transparent px-2 py-3 outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            @change="validate('deposit_amount')"
+                        />
+                        <span
+                            class="flex items-center px-4 font-medium text-muted-foreground"
+                            >{{ formData.currency }}</span
+                        >
+                    </div>
+                    <small class="text-destructive">{{
                         errors.deposit_amount
                     }}</small></label
                 ><label
-                    v-for="field in [
-                        {
-                            n: 'bedrooms',
-                            l: tr('Habitaciones', 'Bedrooms'),
-                        },
-                        { n: 'bathrooms', l: tr('Baños', 'Bathrooms') },
-                        {
-                            n: 'parking_spaces',
-                            l: tr('Estacionamientos', 'Parking'),
-                        },
-                        { n: 'interior_area_m2', l: 'Área interior m²' },
-                        { n: 'lot_area_m2', l: 'Terreno m²' },
-                        {
-                            n: 'year_built',
-                            l: tr('Año de construcción', 'Year built'),
-                        },
-                    ] as const"
+                    v-for="field in featureFieldDefinitions"
                     :key="field.n"
                     class="text-sm font-medium"
-                    >{{ field.l
-                    }}<input
+                    >{{ field.l }}
+                    <span
+                        v-if="featureIsRequired(field.n)"
+                        class="text-destructive"
+                        aria-hidden="true"
+                        >*</span
+                    >
+                    <AreaUnitInput
+                        v-if="isAreaField(field.n)"
+                        v-model="formData[field.n]"
+                        v-model:unit="areaUnits[field.n]"
+                        :name="field.n"
+                        :min="1"
+                        class="mt-2"
+                        :aria-label="field.l"
+                        @change="validate(field.n)"
+                    />
+                    <input
+                        v-else
                         :name="field.n"
                         type="number"
                         :step="field.n === 'bathrooms' ? 0.5 : 1"
                         v-model="formData[field.n]"
-                        class="mt-2 w-full rounded-xl border bg-background px-4 py-3"
+                        class="mt-2 w-full appearance-none rounded-xl border border-input bg-background px-4 py-3 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         @change="validate(field.n)"
                     /><small class="text-destructive">{{
                         errors[field.n]
                     }}</small></label
-                ><label class="text-sm font-medium"
-                    >{{ tr('Amueblado', 'Furnishing')
-                    }}<select
+                ><label
+                    v-if="selectedTypeFields.fields.includes('furnishing')"
+                    class="text-sm font-medium"
+                    >{{ tr('Amueblado', 'Furnishing') }}
+                    <span
+                        v-if="featureIsRequired('furnishing')"
+                        class="text-destructive"
+                        aria-hidden="true"
+                        >*</span
+                    ><select
                         name="furnishing"
                         v-model="formData.furnishing"
                         class="mt-2 w-full rounded-xl border bg-background px-4 py-3"
@@ -1051,7 +1198,9 @@ const confirmSave = (status: SaveStatus, submit: () => void): void => {
                     ><small class="text-destructive">{{
                         errors.furnishing
                     }}</small></label
-                ><label class="flex items-center gap-2 self-end pb-3 text-sm"
+                ><label
+                    v-if="showsRentalTerms"
+                    class="flex items-center gap-2 self-end pb-3 text-sm"
                     ><input
                         type="hidden"
                         name="utilities_included"

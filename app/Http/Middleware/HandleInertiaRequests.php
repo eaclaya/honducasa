@@ -3,11 +3,14 @@
 namespace App\Http\Middleware;
 
 use App\Models\Message;
+use App\Support\CurrencyConverter;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
+    public function __construct(private CurrencyConverter $currencyConverter) {}
+
     /**
      * The root template that's loaded on the first page visit.
      *
@@ -42,6 +45,11 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'locale' => app()->getLocale(),
+            'currency' => [
+                'display' => $this->currencyConverter->displayCurrency(),
+                'base' => $this->currencyConverter->baseCurrency(),
+                'supported' => $this->currencyConverter->supportedCurrencies(),
+            ],
             'auth' => [
                 'user' => $user,
             ],
