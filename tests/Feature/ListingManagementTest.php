@@ -2,7 +2,9 @@
 
 use App\Enums\ListingStatus;
 use App\Enums\LocationPrecision;
+use App\Enums\PropertyType;
 use App\Enums\SubscriptionLadder;
+use App\Models\Conversation;
 use App\Models\Location;
 use App\Models\Property;
 use App\Models\SubscriptionPlan;
@@ -16,6 +18,56 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 uses(RefreshDatabase::class);
+
+test('the listing form exposes the feature template for every property type', function () {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $this->actingAs($user)
+        ->get(route('listings.create', $user->currentTeam))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('propertyTypeFields', count(PropertyType::cases()))
+            ->where('propertyTypeFields.land.fields', ['lot_area_m2'])
+            ->where('propertyTypeFields.land.required', ['lot_area_m2'])
+            ->where('propertyTypeFields.land.supportsRentalTerms', false)
+            ->where('propertyTypeFields.house.required', ['bedrooms', 'bathrooms', 'parking_spaces', 'furnishing']));
+});
+
+test('land listings discard residential characteristics and rental terms', function () {
+    $user = User::factory()->withPersonalTeam()->create();
+    $location = Location::factory()->hondurasCity()->create();
+
+    $this->actingAs($user)
+        ->post(route('listings.store', $user->currentTeam), listingPayload($location, [
+            'type' => PropertyType::Land->value,
+            'lot_area_m2' => 850,
+        ]))
+        ->assertSessionHasNoErrors();
+
+    $property = Property::query()->sole();
+
+    expect($property->lot_area_m2)->toBe(850)
+        ->and($property->bedrooms)->toBeNull()
+        ->and($property->bathrooms)->toBeNull()
+        ->and($property->parking_spaces)->toBeNull()
+        ->and($property->interior_area_m2)->toBeNull()
+        ->and($property->year_built)->toBeNull()
+        ->and($property->furnishing)->toBeNull()
+        ->and($property->deposit_amount)->toBeNull()
+        ->and($property->utilities_included)->toBeNull();
+});
+
+test('land listings require their lot area', function () {
+    $user = User::factory()->withPersonalTeam()->create();
+    $location = Location::factory()->hondurasCity()->create();
+
+    $this->actingAs($user)
+        ->post(route('listings.store', $user->currentTeam), listingPayload($location, [
+            'type' => PropertyType::Land->value,
+            'lot_area_m2' => null,
+        ]))
+        ->assertSessionHasErrors('lot_area_m2');
+});
 
 test('guests cannot manage listings', function () {
     $user = User::factory()->withPersonalTeam()->create();
@@ -67,6 +119,68 @@ test('the listings index does not leak listings owned by another user', function
         ->assertInertia(fn (Assert $page) => $page
             ->has('listings.data', 0)
             ->where('listings.total', 0));
+});
+
+test('the listings index includes location and conversation context for list actions', function () {
+    $user = User::factory()->create();
+    $location = Location::factory()->hondurasCity()->create(['name' => 'Comayagua']);
+    $property = Property::factory()->create([
+        'created_by' => $user->id,
+        'team_id' => null,
+        'location_id' => $location->id,
+        'name' => 'Casa del Centro',
+    ]);
+    Conversation::factory()->count(2)->create([
+        'property_id' => $property->id,
+        'team_id' => null,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('personal-listings.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('listings/Index')
+            ->where('listings.data.0.name', 'Casa del Centro')
+            ->where('listings.data.0.location', 'Comayagua')
+            ->where('listings.data.0.conversationsCount', 2));
+});
+
+test('a listing owner can change its status from the listings index', function () {
+    $user = User::factory()->withPersonalTeam()->create();
+    $property = Property::factory()->create([
+        'team_id' => $user->currentTeam->id,
+        'status' => ListingStatus::Published,
+        'published_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->from(route('listings.index', $user->currentTeam))
+        ->patch(route('listings.status.update', [$user->currentTeam, $property]), [
+            'status' => ListingStatus::Paused->value,
+        ])
+        ->assertRedirect(route('listings.index', $user->currentTeam))
+        ->assertSessionHas('toast.type', 'success');
+
+    expect($property->fresh()->status)->toBe(ListingStatus::Paused)
+        ->and($property->fresh()->published_at)->toBeNull();
+});
+
+test('a user cannot change another owners listing status', function () {
+    $owner = User::factory()->create();
+    $outsider = User::factory()->create();
+    $property = Property::factory()->create([
+        'created_by' => $owner->id,
+        'team_id' => null,
+        'status' => ListingStatus::Draft,
+    ]);
+
+    $this->actingAs($outsider)
+        ->patch(route('personal-listings.status.update', $property), [
+            'status' => ListingStatus::Archived->value,
+        ])
+        ->assertForbidden();
+
+    expect($property->fresh()->status)->toBe(ListingStatus::Draft);
 });
 
 test('publishing from the solo wizard creates an individual listing without a team', function () {

@@ -7,7 +7,9 @@ use App\Data\GeoPoint;
 use App\Enums\ApproximateLocationShape;
 use App\Enums\ListingStatus;
 use App\Enums\LocationPrecision;
+use App\Enums\PropertyType;
 use App\Http\Requests\SaveListingRequest;
+use App\Http\Requests\UpdateListingStatusRequest;
 use App\Models\Location;
 use App\Models\Property;
 use App\Models\Team;
@@ -38,13 +40,16 @@ class ListingController extends Controller
             ?? $request->user()->createdProperties()->whereNull('team_id');
 
         return Inertia::render('listings/Index', [
-            'listings' => $listings->with('media')->latest('id')
+            'listings' => $listings->with(['media', 'location:id,name'])
+                ->withCount('conversations')->latest('id')
                 ->paginate(18)->withQueryString()
                 ->through(fn (Property $property) => [
                     'id' => $property->id, 'slug' => $property->slug, 'name' => $property->name,
                     'status' => $property->status->value, 'listingType' => $property->listing_type->value,
                     'priceAmount' => $property->price_amount, 'currency' => $property->currency,
                     'image' => $property->getFirstMediaUrl('photos', 'thumb') ?: null,
+                    'location' => $property->location->name,
+                    'conversationsCount' => $property->conversations_count,
                 ]),
         ]);
     }
@@ -62,6 +67,7 @@ class ListingController extends Controller
             'listing' => null,
             'locations' => $this->locations(),
             'currencies' => $this->currencyConverter->supportedCurrencies(),
+            'propertyTypeFields' => PropertyType::formConfiguration(),
             'oldInput' => $request->old(),
             'photoEnhancementsRemaining' => $this->photoEnhancementQuota->remaining(
                 $request->user(),
@@ -142,6 +148,7 @@ class ListingController extends Controller
             ],
             'locations' => $this->locations(),
             'currencies' => $this->currencyConverter->supportedCurrencies(),
+            'propertyTypeFields' => PropertyType::formConfiguration(),
             'oldInput' => $request->old(),
             'photoEnhancementsRemaining' => $this->photoEnhancementQuota->remaining(
                 $request->user(),
@@ -159,6 +166,36 @@ class ListingController extends Controller
     public function updatePersonal(SaveListingRequest $request, Property $listing): RedirectResponse
     {
         return $this->updateListing($request, $listing);
+    }
+
+    public function updateStatus(UpdateListingStatusRequest $request, Team $currentTeam, Property $listing, SetListingStatus $setListingStatus): RedirectResponse
+    {
+        return $this->updateListingStatus($request, $listing, $setListingStatus, $currentTeam);
+    }
+
+    public function updatePersonalStatus(UpdateListingStatusRequest $request, Property $listing, SetListingStatus $setListingStatus): RedirectResponse
+    {
+        return $this->updateListingStatus($request, $listing, $setListingStatus);
+    }
+
+    private function updateListingStatus(UpdateListingStatusRequest $request, Property $listing, SetListingStatus $setListingStatus, ?Team $currentTeam = null): RedirectResponse
+    {
+        Gate::authorize('update', $listing);
+        $this->ensureRouteOwnership($request, $listing, $currentTeam);
+
+        $requestedStatus = $request->enum('status', ListingStatus::class);
+        $savedStatus = $setListingStatus->handle($listing, $requestedStatus);
+
+        if ($requestedStatus === ListingStatus::Published && $savedStatus !== ListingStatus::Published) {
+            return back()->with('toast', [
+                'type' => 'warning',
+                'message' => $listing->getMedia('photos')->isEmpty()
+                    ? __('Add at least one photo before publishing this listing.')
+                    : __('You reached your active listing limit. Your property was saved as a draft. Choose a plan to publish it.'),
+            ]);
+        }
+
+        return back()->with('toast', ['type' => 'success', 'message' => __('Listing status updated.')]);
     }
 
     private function updateListing(SaveListingRequest $request, Property $listing, ?Team $currentTeam = null): RedirectResponse
