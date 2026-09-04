@@ -24,6 +24,7 @@ use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\LocationSearchController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PageController;
 use App\Http\Controllers\PlaceSearchController;
 use App\Http\Controllers\PropertyFavoriteController;
 use App\Http\Controllers\PropertyShowController;
@@ -38,6 +39,9 @@ use App\Http\Middleware\EnsureUserIsAdmin;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
+Route::get('/terminos', [PageController::class, 'terms'])->name('terms');
+Route::get('/privacidad', [PageController::class, 'privacy'])->name('privacy');
+Route::get('/preguntas-frecuentes', [PageController::class, 'faq'])->name('faq');
 Route::get('/rentals', RentalSearchController::class)->name('rentals.index');
 Route::get('/locations/search', LocationSearchController::class)
     ->middleware('throttle:60,1')

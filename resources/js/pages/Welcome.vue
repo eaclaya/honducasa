@@ -10,15 +10,23 @@ import {
     Search,
     ShieldCheck,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
-import AppLogoIcon from '@/components/AppLogoIcon.vue';
+import { computed, defineAsyncComponent, ref } from 'vue';
 import LocationTypeahead from '@/components/LocationTypeahead.vue';
+import PublicFooter from '@/components/PublicFooter.vue';
 import PublicHeader from '@/components/PublicHeader.vue';
+import { encodePolygon } from '@/lib/polygonSearch';
 import { register } from '@/routes';
 import { create as createListing } from '@/routes/listings';
 import { create as createPersonalListing } from '@/routes/personal-listings';
 import { index as rentals } from '@/routes/rentals';
 import { index as savedSearchesIndex } from '@/routes/saved-searches';
+
+// Leaflet + leaflet-geoman are a heavy pair (~150KB+77KB gzipped combined)
+// nobody needs unless they actually open the drawer, so this loads on demand
+// rather than bundling into every homepage visit.
+const MapAreaDrawer = defineAsyncComponent(
+    () => import('@/components/MapAreaDrawer.vue'),
+);
 
 type SavedSearch = {
     id: number;
@@ -36,6 +44,7 @@ const location = ref('');
 const listingType = ref('rent');
 const locating = ref(false);
 const locationError = ref('');
+const drawingArea = ref(false);
 const audience = ref<'renters' | 'owners'>('renters');
 const seoTitle = 'Casas y apartamentos en alquiler y venta en Honduras';
 const seoDescription =
@@ -102,6 +111,15 @@ const searchNearby = (): void => {
         },
         { enableHighAccuracy: true, timeout: 10_000, maximumAge: 300_000 },
     );
+};
+
+const searchDrawnArea = (ring: Array<[number, number]>): void => {
+    drawingArea.value = false;
+    location.value = '';
+    router.get(rentals.url(), {
+        polygon: encodePolygon(ring),
+        listing_type: listingType.value,
+    });
 };
 
 const exploreCity = (city: string): void => {
@@ -178,9 +196,11 @@ const exploreCity = (city: string): void => {
                                         )
                                     "
                                     show-near-me
+                                    show-draw-area
                                     :locating="locating"
                                     :location-error="locationError"
                                     @nearby="searchNearby"
+                                    @draw="drawingArea = true"
                                     @select="searchSelectedLocation"
                                 />
                                 <label
@@ -704,23 +724,13 @@ const exploreCity = (city: string): void => {
             </section>
         </main>
 
-        <footer
-            class="bg-[var(--public-surface)] text-[var(--public-text-muted)]"
-        >
-            <div
-                class="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-8"
-            >
-                <div
-                    class="flex items-center gap-2 font-semibold text-[var(--public-text)]"
-                >
-                    <AppLogoIcon class="size-7" /> Honducasa
-                </div>
-                <p>
-                    Hecho para inquilinos, propietarios y comunidades de todo
-                    Honduras.
-                </p>
-                <p>© {{ new Date().getFullYear() }} Honducasa</p>
-            </div>
-        </footer>
+        <PublicFooter />
+
+        <MapAreaDrawer
+            v-if="drawingArea"
+            :locale="locale"
+            @close="drawingArea = false"
+            @search="searchDrawnArea"
+        />
     </div>
 </template>
