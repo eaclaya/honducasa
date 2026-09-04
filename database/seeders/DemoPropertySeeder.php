@@ -63,12 +63,9 @@ class DemoPropertySeeder extends Seeder
     public function run(): void
     {
         $this->call(LocationSeeder::class);
+        $this->call(SuperAdminSeeder::class);
 
-        $owner = User::query()->where('email', 'demo@honducasa.test')->first()
-            ?? User::factory()->withPersonalTeam()->create([
-                'name' => 'Honducasa Demo',
-                'email' => 'demo@honducasa.test',
-            ]);
+        $owner = User::query()->where('email', config('app.superadmin_email'))->firstOrFail();
 
         $teamId = $owner->current_team_id;
 
@@ -236,12 +233,13 @@ class DemoPropertySeeder extends Seeder
     private function listingPricing(string $city, PropertyType $type, ListingType $listingType): array
     {
         $baseRent = match ($type) {
-            PropertyType::Room => 4_500,
-            PropertyType::Studio => 7_000,
+            PropertyType::Land => 6_000,
             PropertyType::Apartment => 11_000,
-            PropertyType::Townhouse => 14_000,
+            PropertyType::OfficeSpace => 13_000,
             PropertyType::House => 15_500,
-            PropertyType::Condominium => 18_000,
+            PropertyType::CommercialSpace => 17_000,
+            PropertyType::Warehouse => 22_000,
+            PropertyType::Building => 40_000,
         };
 
         if ($city === 'Roatán') {

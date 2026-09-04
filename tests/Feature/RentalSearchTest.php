@@ -12,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -38,6 +39,25 @@ test('rental results indicate when the current search is saved', function () {
         'listing_type' => 'rent',
         'location' => 'Tegucigalpa',
     ]))->assertInertia(fn (Assert $page) => $page->where('isSearchSaved', false));
+});
+
+test('rental pagination uses a compact page link window', function () {
+    Property::factory()->count(216)->create();
+
+    $this->get(route('rentals.index', ['page' => 6]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('properties.current_page', 6)
+            ->where('properties.last_page', 12)
+            ->where('properties.links', function (Collection $links): bool {
+                $labels = $links->pluck('label');
+
+                return $links->count() <= 11
+                    && $labels->contains('5')
+                    && $labels->contains('6')
+                    && $labels->contains('7')
+                    && ! $labels->contains('4');
+            }));
 });
 
 test('rental results track refinements made from a saved search', function () {
@@ -259,6 +279,65 @@ test('rentals can be sorted by price', function () {
             ->where('filters.sort', 'price_asc'));
 });
 
+test('a maximum price or area without a minimum still searches', function () {
+    $location = Location::factory()->create(['name' => 'Tegucigalpa']);
+    Property::factory()->for($location)->create([
+        'name' => 'Cheap and small',
+        'type' => PropertyType::House,
+        'currency' => 'HNL',
+        'price_amount' => 5_000,
+        'interior_area_m2' => 40,
+    ]);
+    Property::factory()->for($location)->create([
+        'name' => 'Pricey and large',
+        'type' => PropertyType::House,
+        'currency' => 'HNL',
+        'price_amount' => 50_000,
+        'interior_area_m2' => 400,
+    ]);
+
+    $this->get(route('rentals.index', ['max_price' => 10_000]))
+        ->assertSessionHasNoErrors()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('properties.data', 1)
+            ->where('properties.data.0.name', 'Cheap and small'));
+
+    $this->get(route('rentals.index', ['max_area' => 100]))
+        ->assertSessionHasNoErrors()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('properties.data', 1)
+            ->where('properties.data.0.name', 'Cheap and small'));
+});
+
+test('area filters use lot area for land and preserve the square vara display unit', function () {
+    $location = Location::factory()->create(['name' => 'Tegucigalpa']);
+    Property::factory()->for($location)->create([
+        'name' => 'Matching land',
+        'type' => PropertyType::Land,
+        'interior_area_m2' => null,
+        'lot_area_m2' => 700,
+    ]);
+    Property::factory()->for($location)->create([
+        'name' => 'Small land',
+        'type' => PropertyType::Land,
+        'interior_area_m2' => null,
+        'lot_area_m2' => 300,
+    ]);
+
+    $this->get(route('rentals.index', [
+        'property_type' => PropertyType::Land->value,
+        'min_area' => 650,
+        'max_area' => 750,
+        'area_unit' => 'vara2',
+    ]))->assertSessionHasNoErrors()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('properties.data', 1)
+            ->where('properties.data.0.name', 'Matching land')
+            ->where('filters.minArea', '650')
+            ->where('filters.maxArea', '750')
+            ->where('filters.areaUnit', 'vara2'));
+});
+
 test('rental filter ranges and options are validated', function () {
     $this->get(route('rentals.index', [
         'min_price' => 20_000,
@@ -319,10 +398,68 @@ test('map bounds must be ordered and inside Honduras', function () {
     ]))->assertSessionHasErrors(['east', 'north']);
 });
 
-test('rentals can be searched within two kilometers of the users location', function () {
+test('rentals can be filtered to a drawn polygon area', function () {
+    $location = Location::factory()->create(['name' => 'Tegucigalpa']);
+    Property::factory()->for($location)->at(new GeoPoint(14.08, -87.20))->create(['name' => 'Inside area']);
+    Property::factory()->for($location)->at(new GeoPoint(15.50, -88.03))->create(['name' => 'Outside area']);
+
+    $polygon = [
+        [-87.30, 14.01],
+        [-87.10, 14.01],
+        [-87.10, 14.20],
+        [-87.30, 14.20],
+        [-87.30, 14.01],
+    ];
+
+    $this->get(route('rentals.index', ['polygon' => encodedPolygon($polygon)]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('properties.data', 1)
+            ->where('properties.data.0.name', 'Inside area')
+            ->where('filters.polygon', $polygon));
+});
+
+test('a polygon search takes precedence over bounds and nearby params submitted alongside it', function () {
+    $location = Location::factory()->create(['name' => 'Tegucigalpa']);
+    Property::factory()->for($location)->at(new GeoPoint(14.08, -87.20))->create(['name' => 'Inside polygon']);
+    Property::factory()->for($location)->at(new GeoPoint(15.50, -88.03))->create(['name' => 'Only inside bounds']);
+
+    $this->get(route('rentals.index', [
+        'polygon' => encodedPolygon([
+            [-87.30, 14.00],
+            [-87.10, 14.00],
+            [-87.10, 14.20],
+            [-87.30, 14.20],
+            [-87.30, 14.00],
+        ]),
+        'west' => -89.00,
+        'south' => 13.00,
+        'east' => -87.50,
+        'north' => 16.00,
+    ]))->assertInertia(fn (Assert $page) => $page
+        ->has('properties.data', 1)
+        ->where('properties.data.0.name', 'Inside polygon'));
+});
+
+test('a drawn polygon must have at least four points and must be closed', function () {
+    $this->get(route('rentals.index', [
+        'polygon' => encodedPolygon([[-87.30, 14.00], [-87.10, 14.00], [-87.30, 14.00]]),
+    ]))->assertSessionHasErrors('polygon');
+
+    $this->get(route('rentals.index', [
+        'polygon' => encodedPolygon([[-87.30, 14.00], [-87.10, 14.00], [-87.10, 14.20], [-87.30, 14.19]]),
+    ]))->assertSessionHasErrors('polygon');
+});
+
+test('polygon points must stay inside Honduras', function () {
+    $this->get(route('rentals.index', [
+        'polygon' => encodedPolygon([[-87.30, 14.00], [-87.10, 14.00], [-87.10, 14.20], [-40.00, 14.00], [-87.30, 14.00]]),
+    ]))->assertSessionHasErrors('polygon.3.0');
+});
+
+test('rentals can be searched within five kilometers of the users location', function () {
     $location = Location::factory()->create(['name' => 'Tegucigalpa']);
     Property::factory()->for($location)->at(new GeoPoint(14.0730, -87.1921))->create(['name' => 'Nearby home']);
-    Property::factory()->for($location)->at(new GeoPoint(14.1000, -87.1921))->create(['name' => 'Distant home']);
+    Property::factory()->for($location)->at(new GeoPoint(14.1523, -87.1921))->create(['name' => 'Distant home']);
 
     $this->get(route('rentals.index', [
         'latitude' => 14.0723,
@@ -332,7 +469,40 @@ test('rentals can be searched within two kilometers of the users location', func
         ->where('properties.data.0.name', 'Nearby home')
         ->where('filters.latitude', 14.0723)
         ->where('filters.longitude', -87.1921)
-        ->where('filters.radiusMeters', 2_000));
+        ->where('filters.radiusMeters', 5_000));
+});
+
+test('sorting applies on top of a nearby search instead of being overridden by it', function () {
+    $location = Location::factory()->create(['name' => 'Tegucigalpa']);
+    Property::factory()->for($location)->at(new GeoPoint(14.0724, -87.1921))->create([
+        'name' => 'Closest, cheapest, oldest',
+        'currency' => 'HNL',
+        'price_amount' => 8_000,
+        'published_at' => now()->subWeek(),
+    ]);
+    Property::factory()->for($location)->at(new GeoPoint(14.0800, -87.1921))->create([
+        'name' => 'Farther, priciest, newest',
+        'currency' => 'HNL',
+        'price_amount' => 25_000,
+        'published_at' => now(),
+    ]);
+
+    $nearby = ['latitude' => 14.0723, 'longitude' => -87.1921];
+
+    $this->get(route('rentals.index', [...$nearby, 'sort' => 'price_desc']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('properties.data.0.name', 'Farther, priciest, newest')
+            ->where('properties.data.1.name', 'Closest, cheapest, oldest'));
+
+    $this->get(route('rentals.index', [...$nearby, 'sort' => 'price_asc']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('properties.data.0.name', 'Closest, cheapest, oldest')
+            ->where('properties.data.1.name', 'Farther, priciest, newest'));
+
+    $this->get(route('rentals.index', [...$nearby, 'sort' => 'newest']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('properties.data.0.name', 'Farther, priciest, newest')
+            ->where('properties.data.1.name', 'Closest, cheapest, oldest'));
 });
 
 test('nearby search coordinates must be supplied together and valid', function () {

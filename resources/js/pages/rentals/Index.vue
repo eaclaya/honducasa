@@ -13,7 +13,8 @@ import {
     SlidersHorizontal,
     X,
 } from '@lucide/vue';
-import { computed, reactive, ref, toRefs } from 'vue';
+import { computed, defineAsyncComponent, reactive, ref, toRefs } from 'vue';
+import AreaUnitInput from '@/components/AreaUnitInput.vue';
 import AuthModal from '@/components/AuthModal.vue';
 import LocationTypeahead from '@/components/LocationTypeahead.vue';
 import PropertyResultsMap from '@/components/PropertyResultsMap.vue';
@@ -23,12 +24,22 @@ import SavedSearchRefinementModal from '@/components/SavedSearchRefinementModal.
 import { Toaster } from '@/components/ui/sonner';
 import { usePendingAuthAction } from '@/composables/usePendingAuthAction';
 import type { PendingAuthAction } from '@/composables/usePendingAuthAction';
+import { squareMetersToArea } from '@/lib/areaUnits';
+import type { AreaUnit } from '@/lib/areaUnits';
+import { encodePolygon } from '@/lib/polygonSearch';
 import { store as favorite, destroy as unfavorite } from '@/routes/favorites';
 import { index as rentals } from '@/routes/rentals';
 import {
     store as saveSearchRoute,
     update as updateSavedSearchRoute,
 } from '@/routes/saved-searches';
+
+// Leaflet + leaflet-geoman are a heavy pair (~150KB+77KB gzipped combined)
+// nobody needs unless they actually open the drawer, so this loads on demand
+// rather than bundling into every results-page visit.
+const MapAreaDrawer = defineAsyncComponent(
+    () => import('@/components/MapAreaDrawer.vue'),
+);
 
 type Rental = {
     id: number;
@@ -37,16 +48,16 @@ type Rental = {
     type: string;
     listingType: 'rent' | 'buy';
     location: string;
-    bedrooms: number;
-    bathrooms: string;
-    parkingSpaces: number;
+    bedrooms: number | null;
+    bathrooms: string | null;
+    parkingSpaces: number | null;
     interiorAreaM2: number | null;
-    furnishing: string;
+    furnishing: string | null;
     priceAmount: number;
     currency: string;
     priceIsConverted: boolean;
     depositAmount: number | null;
-    utilitiesIncluded: boolean;
+    utilitiesIncluded: boolean | null;
     mapLatitude: number;
     mapLongitude: number;
     primaryImage: { url: string; altText: string | null } | null;
@@ -72,7 +83,6 @@ type PaginatedRentals = {
 };
 
 type AdvancedFilterKey =
-    | 'currency'
     | 'minPrice'
     | 'maxPrice'
     | 'bedrooms'
@@ -80,6 +90,7 @@ type AdvancedFilterKey =
     | 'parkingSpaces'
     | 'minArea'
     | 'maxArea'
+    | 'areaUnit'
     | 'furnishing'
     | 'utilitiesIncluded';
 
@@ -87,9 +98,9 @@ type RentalResultsContext = {
     location: string;
     nearbyLatitude: number | null;
     nearbyLongitude: number | null;
+    polygonArea: Array<[number, number]> | null;
     propertyType: string;
     listingType: string;
-    currency: string;
     minPrice: string;
     maxPrice: string;
     bedrooms: string;
@@ -97,6 +108,7 @@ type RentalResultsContext = {
     parkingSpaces: string;
     minArea: string;
     maxArea: string;
+    areaUnit: AreaUnit;
     furnishing: string;
     utilitiesIncluded: string;
     sort: string;
@@ -116,6 +128,7 @@ const props = defineProps<{
         parkingSpaces: string;
         minArea: string;
         maxArea: string;
+        areaUnit: AreaUnit;
         furnishing: string;
         utilitiesIncluded: boolean | null;
         sort: string;
@@ -126,9 +139,9 @@ const props = defineProps<{
         latitude: number | null;
         longitude: number | null;
         radiusMeters: number | null;
+        polygon: Array<[number, number]> | null;
     };
     properties: PaginatedRentals;
-    currencies: string[];
     baseCurrency: string;
     isSearchSaved: boolean;
     savedSearch: {
@@ -143,40 +156,58 @@ const locale = computed(() => page.props.locale);
 const tr = (es: string, en: string): string =>
     locale.value === 'es' ? es : en;
 const pageUrl = new URL(page.url, 'http://localhost');
+/**
+ * The advanced filters as the server last applied them. `props.filters` only
+ * changes once a search actually runs, so this is the state the drawer reverts
+ * to when it is dismissed without applying.
+ */
+const appliedAdvancedFilters = (): Pick<
+    RentalResultsContext,
+    AdvancedFilterKey
+> => ({
+    minPrice: props.filters.minPrice,
+    maxPrice: props.filters.maxPrice,
+    bedrooms: props.filters.bedrooms,
+    bathrooms: props.filters.bathrooms,
+    parkingSpaces: props.filters.parkingSpaces,
+    minArea: props.filters.minArea,
+    maxArea: props.filters.maxArea,
+    areaUnit: props.filters.areaUnit,
+    furnishing: props.filters.furnishing,
+    utilitiesIncluded:
+        props.filters.utilitiesIncluded === null
+            ? ''
+            : props.filters.utilitiesIncluded
+              ? '1'
+              : '0',
+});
 const rememberedContext = useRemember(
     reactive<RentalResultsContext>({
         location: props.filters.location,
         nearbyLatitude: props.filters.latitude,
         nearbyLongitude: props.filters.longitude,
+        polygonArea: props.filters.polygon,
         propertyType: props.filters.propertyType,
         listingType: props.filters.listingType,
-        currency: props.filters.currency,
-        minPrice: props.filters.minPrice,
-        maxPrice: props.filters.maxPrice,
-        bedrooms: props.filters.bedrooms,
-        bathrooms: props.filters.bathrooms,
-        parkingSpaces: props.filters.parkingSpaces,
-        minArea: props.filters.minArea,
-        maxArea: props.filters.maxArea,
-        furnishing: props.filters.furnishing,
-        utilitiesIncluded:
-            props.filters.utilitiesIncluded === null
-                ? ''
-                : props.filters.utilitiesIncluded
-                  ? '1'
-                  : '0',
+        ...appliedAdvancedFilters(),
         sort: props.filters.sort,
         showMap: pageUrl.searchParams.get('view') === 'map',
     }),
     'rentals.results',
 ) as RentalResultsContext;
+/**
+ * Prices render in whatever currency the server resolved for this response —
+ * the visitor's header preference, or an explicit `?currency=` override that
+ * keeps shared links and saved searches faithful to what they captured.
+ */
+const currency = computed(() => props.filters.currency);
 const {
     location,
     nearbyLatitude,
     nearbyLongitude,
+    polygonArea,
     propertyType,
     listingType,
-    currency,
     minPrice,
     maxPrice,
     bedrooms,
@@ -184,6 +215,7 @@ const {
     parkingSpaces,
     minArea,
     maxArea,
+    areaUnit,
     furnishing,
     utilitiesIncluded,
     sort,
@@ -206,10 +238,13 @@ const refinementModalOpen = ref(false);
 const nearbyActive = computed(
     () => nearbyLatitude.value !== null && nearbyLongitude.value !== null,
 );
-const clearNearbySearch = (): void => {
+const polygonAreaActive = computed(() => polygonArea.value !== null);
+const clearAreaSearch = (): void => {
     nearbyLatitude.value = null;
     nearbyLongitude.value = null;
+    polygonArea.value = null;
 };
+const drawingArea = ref(false);
 const authModalOpen = ref(false);
 const authModalDescription = ref<string | undefined>(undefined);
 const { remember: rememberPendingAuthAction } = usePendingAuthAction();
@@ -368,12 +403,14 @@ const queryParameters = (
     parking_spaces: parkingSpaces.value || undefined,
     min_area: minArea.value || undefined,
     max_area: maxArea.value || undefined,
+    area_unit: areaUnit.value === 'm2' ? undefined : areaUnit.value,
     furnishing: furnishing.value || undefined,
     utilities_included:
         utilitiesIncluded.value === '' ? undefined : utilitiesIncluded.value,
     sort: sort.value === 'newest' ? undefined : sort.value,
     latitude: nearbyLatitude.value ?? undefined,
     longitude: nearbyLongitude.value ?? undefined,
+    polygon: polygonArea.value ? encodePolygon(polygonArea.value) : undefined,
     saved_search: props.savedSearch?.id,
     ...additional,
 });
@@ -387,13 +424,32 @@ const search = (): void => {
 
 const searchSelectedLocation = (selectedLocation: string): void => {
     location.value = selectedLocation;
-    clearNearbySearch();
+    clearAreaSearch();
+    search();
+};
+
+const searchDrawnArea = (ring: Array<[number, number]>): void => {
+    drawingArea.value = false;
+    location.value = '';
+    nearbyLatitude.value = null;
+    nearbyLongitude.value = null;
+    polygonArea.value = ring;
     search();
 };
 
 const applyFilters = (): void => {
     showFilters.value = false;
     search();
+};
+
+/**
+ * Dismissing the drawer (X or backdrop) must not leave edits behind: the chips
+ * read this same state, so uncommitted edits would otherwise label the results
+ * with filters that were never sent to the server.
+ */
+const discardFilters = (): void => {
+    Object.assign(rememberedContext, appliedAdvancedFilters());
+    showFilters.value = false;
 };
 
 const searchMapBounds = (bounds: {
@@ -411,11 +467,10 @@ const searchMapBounds = (bounds: {
 
 const activeAdvancedFilters = computed(() => {
     const filters: Array<{ key: AdvancedFilterKey; label: string }> = [];
-    const money = currency.value || props.baseCurrency;
-
-    if (currency.value && currency.value !== props.baseCurrency) {
-        filters.push({ key: 'currency', label: currency.value });
-    }
+    const money = currency.value;
+    const areaSuffix = areaUnit.value === 'vara2' ? 'varas²' : 'm²';
+    const displayArea = (value: string): number =>
+        squareMetersToArea(Number(value), areaUnit.value);
 
     if (minPrice.value) {
         filters.push({
@@ -455,14 +510,14 @@ const activeAdvancedFilters = computed(() => {
     if (minArea.value) {
         filters.push({
             key: 'minArea',
-            label: `${tr('Área desde', 'Area from')} ${minArea.value} m²`,
+            label: `${tr('Área desde', 'Area from')} ${displayArea(minArea.value)} ${areaSuffix}`,
         });
     }
 
     if (maxArea.value) {
         filters.push({
             key: 'maxArea',
-            label: `${tr('Área hasta', 'Area up to')} ${maxArea.value} m²`,
+            label: `${tr('Área hasta', 'Area up to')} ${displayArea(maxArea.value)} ${areaSuffix}`,
         });
     }
 
@@ -491,9 +546,7 @@ const priceFilterLabel = computed(() => {
         return tr('Precio', 'Price');
     }
 
-    const selectedCurrency = currency.value || props.baseCurrency;
-
-    return `${selectedCurrency} ${minPrice.value || '0'}–${maxPrice.value || '∞'}`;
+    return `${currency.value} ${minPrice.value || '0'}–${maxPrice.value || '∞'}`;
 });
 
 const roomsFilterLabel = computed(() =>
@@ -506,27 +559,28 @@ const homeTypeFilterLabel = computed(() =>
     propertyType.value
         ? tr(
               {
-                  apartment: 'Apartamento',
                   house: 'Casa',
-                  condominium: 'Condominio',
-                  townhouse: 'Casa adosada',
-                  room: 'Habitación',
-                  studio: 'Estudio',
+                  apartment: 'Apartamento',
+                  commercial_space: 'Local Comercial',
+                  land: 'Terreno',
+                  office_space: 'Local Para Oficina',
+                  warehouse: 'Bodega',
+                  building: 'Edificio',
               }[propertyType.value] ?? humanize(propertyType.value),
               {
-                  apartment: 'Apartment',
                   house: 'House',
-                  condominium: 'Condo',
-                  townhouse: 'Townhouse',
-                  room: 'Room',
-                  studio: 'Studio',
+                  apartment: 'Apartment',
+                  commercial_space: 'Commercial Space',
+                  land: 'Land',
+                  office_space: 'Office Space',
+                  warehouse: 'Warehouse',
+                  building: 'Building',
               }[propertyType.value] ?? humanize(propertyType.value),
           )
         : tr('Tipo de propiedad', 'Home type'),
 );
 
 const clearAdvancedFilters = (): void => {
-    currency.value = props.baseCurrency;
     minPrice.value = '';
     maxPrice.value = '';
     bedrooms.value = '';
@@ -546,8 +600,12 @@ const humanize = (value: string): string =>
 
 const paginationLabel = (label: string): string =>
     label
-        .replace('&laquo; Previous', 'Previous')
-        .replace('Next &raquo;', 'Next');
+        .replace('&laquo; Previous', tr('Anterior', 'Previous'))
+        .replace('Next &raquo;', tr('Siguiente', 'Next'));
+const previousPageLink = computed(() => props.properties.links[0]);
+const nextPageLink = computed(
+    () => props.properties.links[props.properties.links.length - 1],
+);
 
 const cardTone = (index: number): string =>
     [
@@ -598,10 +656,17 @@ const canonicalUrl = computed(() =>
                         :locale="locale"
                         :placeholder="
                             nearbyActive
-                                ? tr('Cerca de mí · 2 km', 'Near me · 2 km')
-                                : tr('Ciudad o colonia', 'City or neighborhood')
+                                ? tr('Cerca de mí · 5 km', 'Near me · 5 km')
+                                : polygonAreaActive
+                                  ? tr('Área dibujada', 'Custom drawn area')
+                                  : tr(
+                                        'Ciudad o colonia',
+                                        'City or neighborhood',
+                                    )
                         "
-                        @input="clearNearbySearch"
+                        show-draw-area
+                        @input="clearAreaSearch"
+                        @draw="drawingArea = true"
                         @select="searchSelectedLocation"
                     />
                     <label
@@ -759,7 +824,7 @@ const canonicalUrl = computed(() =>
                         type="button"
                         class="fixed inset-0 z-40 bg-black/55"
                         :aria-label="tr('Cerrar filtros', 'Close filters')"
-                        @click="showFilters = false"
+                        @click="discardFilters"
                     />
                 </Transition>
                 <Transition
@@ -787,7 +852,7 @@ const canonicalUrl = computed(() =>
                                 :aria-label="
                                     tr('Cerrar filtros', 'Close filters')
                                 "
-                                @click="showFilters = false"
+                                @click="discardFilters"
                             >
                                 <X class="size-6" />
                             </button>
@@ -803,27 +868,11 @@ const canonicalUrl = computed(() =>
                                 <p class="mt-1 text-sm text-stone-500">
                                     {{
                                         tr(
-                                            'Mostrar precios en',
-                                            'Show prices in',
+                                            `Montos en ${currency}. Cambia la moneda en la barra superior.`,
+                                            `Amounts in ${currency}. Change the currency in the top bar.`,
                                         )
                                     }}
                                 </p>
-                                <div class="mt-4 grid grid-cols-3 gap-2">
-                                    <button
-                                        v-for="option in currencies"
-                                        :key="option"
-                                        type="button"
-                                        class="rounded-xl border px-3 py-3 text-sm font-semibold transition"
-                                        :class="
-                                            currency === option
-                                                ? 'border-blue-700 bg-blue-50 text-blue-800'
-                                                : 'border-stone-300 hover:border-stone-500'
-                                        "
-                                        @click="currency = option"
-                                    >
-                                        {{ option }}
-                                    </button>
-                                </div>
                                 <div class="mt-4 grid grid-cols-2 gap-3">
                                     <label
                                         class="grid min-w-0 gap-2 text-sm font-semibold"
@@ -833,7 +882,7 @@ const canonicalUrl = computed(() =>
                                             v-model="minPrice"
                                             type="number"
                                             min="0"
-                                            class="w-full min-w-0 rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
+                                            class="w-full min-w-0 appearance-none rounded-xl border border-stone-300 bg-transparent px-4 py-3 font-normal outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                             :placeholder="
                                                 tr('Sin mínimo', 'No min')
                                             "
@@ -847,7 +896,7 @@ const canonicalUrl = computed(() =>
                                             v-model="maxPrice"
                                             type="number"
                                             min="0"
-                                            class="w-full min-w-0 rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
+                                            class="w-full min-w-0 appearance-none rounded-xl border border-stone-300 bg-transparent px-4 py-3 font-normal outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                             :placeholder="
                                                 tr('Sin máximo', 'No max')
                                             "
@@ -955,24 +1004,29 @@ const canonicalUrl = computed(() =>
                                                 en: 'Apartment',
                                             },
                                             {
-                                                value: 'condominium',
-                                                es: 'Condominio',
-                                                en: 'Condo',
+                                                value: 'commercial_space',
+                                                es: 'Local Comercial',
+                                                en: 'Commercial Space',
                                             },
                                             {
-                                                value: 'townhouse',
-                                                es: 'Casa adosada',
-                                                en: 'Townhouse',
+                                                value: 'land',
+                                                es: 'Terreno',
+                                                en: 'Land',
                                             },
                                             {
-                                                value: 'room',
-                                                es: 'Habitación',
-                                                en: 'Room',
+                                                value: 'office_space',
+                                                es: 'Local Para Oficina',
+                                                en: 'Office Space',
                                             },
                                             {
-                                                value: 'studio',
-                                                es: 'Estudio',
-                                                en: 'Studio',
+                                                value: 'warehouse',
+                                                es: 'Bodega',
+                                                en: 'Warehouse',
+                                            },
+                                            {
+                                                value: 'building',
+                                                es: 'Edificio',
+                                                en: 'Building',
                                             },
                                         ]"
                                         :key="option.value || 'any'"
@@ -1060,38 +1114,36 @@ const canonicalUrl = computed(() =>
                                     <label
                                         class="grid min-w-0 gap-2 text-sm font-semibold"
                                     >
-                                        {{
-                                            tr(
-                                                'Área mínima m²',
-                                                'Minimum area m²',
-                                            )
-                                        }}
-                                        <input
+                                        {{ tr('Área mínima', 'Minimum area') }}
+                                        <AreaUnitInput
                                             v-model="minArea"
-                                            type="number"
-                                            min="0"
-                                            class="w-full min-w-0 rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
+                                            v-model:unit="areaUnit"
                                             :placeholder="
                                                 tr('Sin mínimo', 'No min')
+                                            "
+                                            :aria-label="
+                                                tr(
+                                                    'Unidad del área mínima',
+                                                    'Minimum area unit',
+                                                )
                                             "
                                         />
                                     </label>
                                     <label
                                         class="grid min-w-0 gap-2 text-sm font-semibold"
                                     >
-                                        {{
-                                            tr(
-                                                'Área máxima m²',
-                                                'Maximum area m²',
-                                            )
-                                        }}
-                                        <input
+                                        {{ tr('Área máxima', 'Maximum area') }}
+                                        <AreaUnitInput
                                             v-model="maxArea"
-                                            type="number"
-                                            min="0"
-                                            class="w-full min-w-0 rounded-xl border border-stone-300 px-4 py-3 font-normal outline-none focus:border-blue-700"
+                                            v-model:unit="areaUnit"
                                             :placeholder="
                                                 tr('Sin máximo', 'No max')
+                                            "
+                                            :aria-label="
+                                                tr(
+                                                    'Unidad del área máxima',
+                                                    'Maximum area unit',
+                                                )
                                             "
                                         />
                                     </label>
@@ -1251,39 +1303,103 @@ const canonicalUrl = computed(() =>
                         ><Search class="size-7"
                     /></span>
                     <h2 class="mt-6 text-2xl font-semibold">
-                        Try another location
+                        {{
+                            tr(
+                                'Prueba con otra ubicación',
+                                'Try another location',
+                            )
+                        }}
                     </h2>
                     <p class="mt-3 leading-7 text-stone-600">
-                        Search Tegucigalpa, San Pedro Sula, La Ceiba, Roatán, or
-                        another major Honduran city.
+                        {{
+                            tr(
+                                'Busca Tegucigalpa, San Pedro Sula, La Ceiba, Roatán u otra ciudad importante.',
+                                'Search Tegucigalpa, San Pedro Sula, La Ceiba, Roatán, or another major city.',
+                            )
+                        }}
                     </p>
                 </div>
             </section>
 
             <nav
                 v-if="properties.last_page > 1"
-                class="mt-10 flex flex-wrap justify-center gap-2"
-                aria-label="Search result pages"
+                class="mt-10"
+                :aria-label="
+                    tr(
+                        'Páginas de resultados de búsqueda',
+                        'Search result pages',
+                    )
+                "
             >
-                <template v-for="link in properties.links" :key="link.label">
+                <div class="flex items-center justify-between gap-3 sm:hidden">
                     <Link
-                        v-if="link.url"
-                        :href="link.url"
+                        v-if="previousPageLink?.url"
+                        :href="previousPageLink.url"
                         preserve-scroll
-                        class="grid min-w-10 place-items-center rounded-xl border px-3 py-2 text-sm font-semibold transition"
-                        :class="
-                            link.active
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-[var(--public-border)] bg-[var(--public-surface-raised)] hover:border-primary'
-                        "
-                        >{{ paginationLabel(link.label) }}</Link
+                        class="rounded-xl border border-[var(--public-border)] bg-[var(--public-surface-raised)] px-4 py-2.5 text-sm font-semibold transition hover:border-primary"
                     >
+                        {{ tr('Anterior', 'Previous') }}
+                    </Link>
                     <span
                         v-else
-                        class="grid min-w-10 place-items-center rounded-xl border border-stone-200 px-3 py-2 text-sm text-stone-300"
-                        >{{ paginationLabel(link.label) }}</span
+                        aria-disabled="true"
+                        class="rounded-xl border border-[var(--public-border)] px-4 py-2.5 text-sm text-[var(--public-text-muted)] opacity-50"
                     >
-                </template>
+                        {{ tr('Anterior', 'Previous') }}
+                    </span>
+
+                    <span
+                        class="text-center text-sm font-medium text-[var(--public-text-muted)]"
+                    >
+                        {{ tr('Página', 'Page') }}
+                        <strong class="text-[var(--public-text)]">
+                            {{ properties.current_page }}
+                        </strong>
+                        {{ tr('de', 'of') }} {{ properties.last_page }}
+                    </span>
+
+                    <Link
+                        v-if="nextPageLink?.url"
+                        :href="nextPageLink.url"
+                        preserve-scroll
+                        class="rounded-xl border border-[var(--public-border)] bg-[var(--public-surface-raised)] px-4 py-2.5 text-sm font-semibold transition hover:border-primary"
+                    >
+                        {{ tr('Siguiente', 'Next') }}
+                    </Link>
+                    <span
+                        v-else
+                        aria-disabled="true"
+                        class="rounded-xl border border-[var(--public-border)] px-4 py-2.5 text-sm text-[var(--public-text-muted)] opacity-50"
+                    >
+                        {{ tr('Siguiente', 'Next') }}
+                    </span>
+                </div>
+
+                <div class="hidden flex-wrap justify-center gap-2 sm:flex">
+                    <template
+                        v-for="link in properties.links"
+                        :key="link.label"
+                    >
+                        <Link
+                            v-if="link.url"
+                            :href="link.url"
+                            preserve-scroll
+                            class="grid min-w-10 place-items-center rounded-xl border px-3 py-2 text-sm font-semibold transition"
+                            :class="
+                                link.active
+                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    : 'border-[var(--public-border)] bg-[var(--public-surface-raised)] hover:border-primary'
+                            "
+                            :aria-current="link.active ? 'page' : undefined"
+                            >{{ paginationLabel(link.label) }}</Link
+                        >
+                        <span
+                            v-else
+                            class="grid min-w-10 place-items-center rounded-xl border border-[var(--public-border)] px-3 py-2 text-sm text-[var(--public-text-muted)] opacity-50"
+                            >{{ paginationLabel(link.label) }}</span
+                        >
+                    </template>
+                </div>
             </nav>
         </main>
 
@@ -1298,6 +1414,12 @@ const canonicalUrl = computed(() =>
             :search-name="savedSearch.name"
             @update="updateSavedSearch"
             @duplicate="saveRefinedSearchAsNew"
+        />
+        <MapAreaDrawer
+            v-if="drawingArea"
+            :locale="locale"
+            @close="drawingArea = false"
+            @search="searchDrawnArea"
         />
         <Toaster />
     </div>

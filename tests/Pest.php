@@ -132,3 +132,17 @@ function listingPayload(Location $location, array $overrides = []): array
         'approximate_polygon' => null,
     ], $overrides);
 }
+
+/**
+ * The `lng,lat;lng,lat;...` format a drawn search area actually travels as
+ * over HTTP (see PolygonQueryParameter) — tests should exercise that real
+ * wire format rather than passing a PHP array straight through `route()`,
+ * which `http_build_query` would serialize differently than the frontend
+ * does.
+ *
+ * @param  list<array{0: float, 1: float}>  $points
+ */
+function encodedPolygon(array $points): string
+{
+    return implode(';', array_map(fn (array $point): string => implode(',', $point), $points));
+}
